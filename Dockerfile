@@ -28,6 +28,7 @@ RUN apk add --no-cache \
       curl \
       bash \
       tini \
+      ffmpeg \
  && rm -rf /var/cache/* \
  && mkdir /var/cache/apk
 

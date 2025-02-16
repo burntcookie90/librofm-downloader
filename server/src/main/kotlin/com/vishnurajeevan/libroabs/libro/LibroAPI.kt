@@ -14,6 +14,12 @@ interface LibroAPI {
     @Query("page") page: Int = 1
   ): LibraryMetadata
 
+  @GET("api/v10/explore/audiobook_details/{isbn}")
+  suspend fun fetchAudiobookDetails(
+    @Header("Authorization") authToken: String,
+    @Path("isbn") isbn: String
+  ): Book
+
   @GET("api/v10/download-manifest")
   suspend fun fetchDownloadMetadata(
     @Header("Authorization") authToken: String,

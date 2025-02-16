@@ -10,6 +10,7 @@ kotlinxIo = "0.6.0"
 ktor = "3.0.0"
 ktorfit = "2.2.0"
 logback = "1.5.16"
+ffmpeg = "0.8.0"
 
 [libraries]
 cardiologist = { module = "io.github.kevincianfarini.cardiologist:cardiologist", version.ref = "cardiologist" }
@@ -28,6 +29,7 @@ ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "k
 ktor-server-tests = { module = "io.ktor:ktor-server-tests-jvm", version.ref = "ktor" }
 ktor-serialization-kotlinx = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+ffmpeg = { module = "net.bramp.ffmpeg:ffmpeg", version.ref = "ffmpeg" }
 
 ktorfit-lib = { module = "de.jensklingenberg.ktorfit:ktorfit-lib", version.ref = "ktorfit" }
 ktorfit-call = { module = "de.jensklingenberg.ktorfit:ktorfit-converters-call", version.ref = "ktorfit" }

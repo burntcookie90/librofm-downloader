@@ -20,3 +20,4 @@ captures
 .env
 run/
 /.java-version
+/server/bin
