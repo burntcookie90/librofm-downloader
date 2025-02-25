@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.clikt)
     implementation(libs.logback)
     implementation(libs.jaudiotagger)
+    implementation(libs.ffmpeg)
     implementation(libs.kotlinx.io)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
