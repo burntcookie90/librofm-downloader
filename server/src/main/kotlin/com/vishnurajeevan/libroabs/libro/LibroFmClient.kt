@@ -191,6 +191,11 @@ class LibroApiHandler(
       })
   }
 
+  suspend fun deleteMp3Files(targetDirectory: File) = withContext(Dispatchers.IO) {
+    targetDirectory.listFiles { file -> file.extension == "mp3" }
+        ?.forEach { it.delete() }
+  }
+
   private fun Int.padToTotal(total: Int): String {
     return toString().padStart(total.toString().length, '0')
   }

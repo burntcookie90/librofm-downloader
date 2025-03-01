@@ -9,9 +9,12 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
+import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
+import com.vishnurajeevan.libroabs.libro.Book
 import com.vishnurajeevan.libroabs.libro.LibraryMetadata
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
+import com.vishnurajeevan.libroabs.libro.M4BUtil
 import io.github.kevincianfarini.cardiologist.intervalPulse
 import io.ktor.client.HttpClient
 import io.ktor.server.engine.embeddedServer
@@ -34,6 +37,12 @@ fun main(args: Array<String>) {
   NoOpCliktCommand(name = "librofm-abs")
     .subcommands(Run())
     .main(args)
+}
+
+enum class Format {
+  MP3,
+  M4B,
+  Both
 }
 
 class Run : CliktCommand("run") {
@@ -59,6 +68,16 @@ class Run : CliktCommand("run") {
 
   private val writeTitleTag by option("--write-title-tag", envvar = "WRITE_TITLE_TAG")
     .flag(default = false)
+
+  private val format: Format by option("--format", envvar = "FORMAT")
+    .enum<Format>()
+    .default(Format.MP3)
+
+  private val ffmpegPath by option("--ffmpeg-path")
+    .default("/usr/bin/ffmpeg")
+
+  private val ffprobePath by option("--ffprobe-path")
+    .default("/usr/bin/ffprobe")
 
   private val verbose by option("--verbose", "-v", envvar = "VERBOSE")
     .flag(default = false)
@@ -89,6 +108,10 @@ class Run : CliktCommand("run") {
     )
   }
 
+  private val m4bUtil by lazy {
+    M4BUtil(ffmpegPath, ffprobePath)
+  }
+
   private val serverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
   override fun run() {
@@ -100,6 +123,9 @@ class Run : CliktCommand("run") {
         dryRun: $dryRun
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
+        format: $format
+        ffmpegPath: $ffmpegPath
+        ffprobePath: $ffprobePath
         verbose: $verbose
         libroFmUsername: $libroFmUsername
         libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}
@@ -150,6 +176,18 @@ class Run : CliktCommand("run") {
                 libroFmApi.fetchLibrary()
                 processLibrary()
               }
+              post("/convertToM4b/{isbn}") {
+                call.parameters["isbn"]?.let { isbn ->
+                  val overwrite = !call.queryParameters["overwrite"].isNullOrBlank()
+                  if (isbn == "all") {
+                    call.respondText("Starting conversion process for all books in the library" + if (overwrite) " and overwriting existing books" else "")
+                    convertAllBooksToM4b(overwrite)
+                  } else {
+                    call.respondText("Starting conversion process for $isbn"+ if (overwrite) " and overwriting existing book" else "")
+                    convertBookToM4b(isbn, overwrite)
+                  }
+                }
+              }
             }
           }
         ).start(wait = true)
@@ -157,17 +195,20 @@ class Run : CliktCommand("run") {
     }
   }
 
-  private suspend fun processLibrary() {
-    val localLibrary = Json.decodeFromString<LibraryMetadata>(
+  private fun getLibrary(): LibraryMetadata {
+    return Json.decodeFromString<LibraryMetadata>(
       File("$dataDir/library.json").readText()
     )
+  }
+
+  private suspend fun processLibrary() {
+    val localLibrary = getLibrary()
 
     localLibrary.audiobooks
       .let {
         if (devMode) {
           it.take(1)
-        }
-        else {
+        } else {
           it
         }
       }
@@ -191,11 +232,64 @@ class Run : CliktCommand("run") {
               writeTitleTag = writeTitleTag
             )
           }
-        }
-        else {
+          if (format == Format.M4B || format == Format.Both) {
+            lfdLogger("Converting ${book.title} from mp3 to m4b.")
+            convertBookToM4b(book)
+          }
+        } else {
           lfdLogger("skipping ${book.title} as it exists on the filesystem!")
         }
       }
+  }
+
+  private suspend fun convertAllBooksToM4b(overwrite: Boolean = false) {
+    val localLibrary = getLibrary()
+
+    localLibrary.audiobooks
+      .let {
+        if (devMode) {
+          it.take(1)
+        } else {
+          it
+        }
+      }
+      .forEach { book ->
+        convertBookToM4b(book, overwrite)
+      }
+  }
+
+  private suspend fun convertBookToM4b(isbn: String, overwrite: Boolean = false) {
+    val localLibrary = getLibrary()
+    val book = localLibrary.audiobooks.find { it.isbn == isbn }
+    if (book == null) {
+      lfdLogger("Book with isbn $isbn not found!")
+    } else {
+      convertBookToM4b(book, overwrite)
+    }
+  }
+
+  private suspend fun convertBookToM4b(book: Book, overwrite: Boolean = false) {
+    val targetDir = File("$mediaDir/${book.authors.first()}/${book.title}")
+    if (!targetDir.exists()) {
+      lfdLogger("Book ${book.title} is not downloaded yet!")
+      return
+    }
+
+    if(!overwrite) {
+      val targetFile = File("$mediaDir/${book.authors.first()}/${book.title}/${book.title}.m4b")
+      if (targetFile.exists()) {
+        lfdLogger("Skipping ${book.title} as it's already converted!")
+        return
+      }
+    }
+
+    lfdLogger("Converting ${book.title} from mp3 to m4b.")
+    m4bUtil.convertBookToM4b(book, targetDir)
+
+    if (format == Format.M4B) {
+      lfdLogger("Deleting obsolete mp3 files for ${book.title}")
+      libroFmApi.deleteMp3Files(targetDir)
+    }
   }
 }
 
