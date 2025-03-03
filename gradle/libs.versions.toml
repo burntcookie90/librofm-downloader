@@ -10,7 +10,7 @@ kotlinxSerialization = "2.1.10"
 kotlinxIo = "0.6.0"
 ktor = "3.0.0"
 ktorfit = "2.4.0"
-logback = "1.5.16"
+logback = "1.5.17"
 
 [libraries]
 cardiologist = { module = "io.github.kevincianfarini.cardiologist:cardiologist", version.ref = "cardiologist" }
