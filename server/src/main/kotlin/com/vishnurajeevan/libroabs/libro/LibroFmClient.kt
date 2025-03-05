@@ -165,15 +165,9 @@ class LibroApiHandler(
 
     val sortedTracks = tracks.sortedBy { it.number }
 
-    val newFilenames = sortedTracks
-      .map { track ->
-        "${track.number.padToTotal(tracks.size)} - $title - ${track.chapter_title}"
-      }
+    val newFilenames = createFilenames(sortedTracks, title)
 
-    val trackTitles = sortedTracks
-      .map { track ->
-        "${track.number.padToTotal(tracks.size)} - ${track.chapter_title}"
-      }
+    val trackTitles = createTrackTitles(sortedTracks)
 
     targetDirectory.listFiles()
       ?.sortedBy { it.nameWithoutExtension }
@@ -189,9 +183,5 @@ class LibroApiHandler(
           audioFile.commit()
         }
       })
-  }
-
-  private fun Int.padToTotal(total: Int): String {
-    return toString().padStart(total.toString().length, '0')
   }
 }

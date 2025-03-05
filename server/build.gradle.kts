@@ -30,6 +30,6 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktorfit.lib)
-    testImplementation(libs.ktor.server.tests)
+
     testImplementation(libs.kotlin.test.junit)
 }
