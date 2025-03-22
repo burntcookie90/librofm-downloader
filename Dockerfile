@@ -41,7 +41,9 @@ ENV \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
     DEV_MODE="false" \
-    SYNC_INTERVAL="d"
+    SYNC_INTERVAL="d" \
+    PARALLEL_PROCESSING_LIMIT=5 \
+    JAVA_OPTS="-Xmx4G"
 
 WORKDIR /app
 COPY scripts/run.sh ./
