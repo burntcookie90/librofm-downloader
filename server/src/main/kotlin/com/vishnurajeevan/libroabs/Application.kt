@@ -20,17 +20,14 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.util.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import net.bramp.ffmpeg.FFmpeg
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFprobe
 import java.io.File
+import java.util.concurrent.Semaphore
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
@@ -73,6 +70,13 @@ class Run : CliktCommand("run") {
 
   private val ffprobePath by option("--ffprobe-path")
     .default("/usr/bin/ffprobe")
+
+  private val parallelProcessingLimit: Int by option(
+    "--parallel-processing-limit",
+    envvar = "PARALLEL_PROCESSING_LIMIT"
+  )
+    .int()
+    .default(5)
 
   private val verbose by option("--verbose", "-v", envvar = "VERBOSE")
     .flag(default = false)
@@ -124,11 +128,14 @@ class Run : CliktCommand("run") {
         format: $format
         ffmpegPath: $ffmpegPath
         ffprobePath: $ffprobePath
+        parallelProcessingLimit: $parallelProcessingLimit
         verbose: $verbose
         libroFmUsername: $libroFmUsername
         libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}
       """.trimIndent()
     )
+
+    val processingLimitSemaphore = Semaphore(parallelProcessingLimit)
 
     runBlocking {
       val dataDir = File(dataDir).apply {
@@ -143,7 +150,7 @@ class Run : CliktCommand("run") {
       }
 
       libroFmApi.fetchLibrary()
-      processLibrary()
+      processLibrary(processingLimitSemaphore)
 
       launch {
         lfdLogger("Sync Interval: $syncInterval")
@@ -158,7 +165,7 @@ class Run : CliktCommand("run") {
           .beat { _, _ ->
             lfdLogger("Checking library on pulse!")
             libroFmApi.fetchLibrary()
-            processLibrary()
+            processLibrary(processingLimitSemaphore)
           }
       }
 
@@ -172,14 +179,14 @@ class Run : CliktCommand("run") {
               post("/update") {
                 call.respondText("Updating!")
                 libroFmApi.fetchLibrary()
-                processLibrary()
+                processLibrary(processingLimitSemaphore)
               }
               post("/convertToM4b/{isbn}") {
                 call.parameters["isbn"]?.let { isbn ->
                   val overwrite = !call.queryParameters["overwrite"].isNullOrBlank()
                   if (isbn == "all") {
                     call.respondText("Starting conversion process for all books in the library" + if (overwrite) " and overwriting existing books" else "")
-                    convertAllBooksToM4b(overwrite)
+                    convertAllBooksToM4b(processingLimitSemaphore, overwrite)
                   } else {
                     call.respondText("Starting conversion process for $isbn" + if (overwrite) " and overwriting existing book" else "")
                     convertBookToM4b(isbn, overwrite)
@@ -199,9 +206,9 @@ class Run : CliktCommand("run") {
     )
   }
 
-  private suspend fun processLibrary() {
+  private fun processLibrary(processingLimitSemaphore: Semaphore) {
     val localLibrary = getLibrary()
-
+    val scope = CoroutineScope(Dispatchers.IO)
     localLibrary.audiobooks
       .let {
         if (devMode) {
@@ -210,28 +217,35 @@ class Run : CliktCommand("run") {
           it
         }
       }
-      .forEach { book ->
-        val targetDir = targetDir(book)
+      .map { book ->
+        scope.launch {
+          processingLimitSemaphore.acquire()
+          try {
+            val targetDir = targetDir(book)
 
-        if (!targetDir.exists()) {
-          lfdLogger("downloading ${book.title}")
-          targetDir.mkdirs()
-          val downloadData = downloadBook(book, targetDir)
+            if (!targetDir.exists()) {
+              lfdLogger("downloading ${book.title}")
+              targetDir.mkdirs()
+              val downloadData = downloadBook(book, targetDir)
 
-          if (renameChapters) {
-            libroFmApi.renameChapters(
-              title = book.title,
-              tracks = downloadData.tracks,
-              targetDirectory = targetDir,
-              writeTitleTag = writeTitleTag
-            )
+              if (renameChapters) {
+                libroFmApi.renameChapters(
+                  title = book.title,
+                  tracks = downloadData.tracks,
+                  targetDirectory = targetDir,
+                  writeTitleTag = writeTitleTag
+                )
+              }
+              if (format == BookFormat.M4B || format == BookFormat.Both) {
+                lfdLogger("Converting ${book.title} from mp3 to m4b.")
+                convertBookToM4b(book)
+              }
+            } else {
+              lfdLogger("skipping ${book.title} as it exists on the filesystem!")
+            }
+          } finally {
+            processingLimitSemaphore.release() // Release the slot when done
           }
-          if (format == BookFormat.M4B || format == BookFormat.Both) {
-            lfdLogger("Converting ${book.title} from mp3 to m4b.")
-            convertBookToM4b(book)
-          }
-        } else {
-          lfdLogger("skipping ${book.title} as it exists on the filesystem!")
         }
       }
   }
@@ -248,9 +262,9 @@ class Run : CliktCommand("run") {
     return downloadData
   }
 
-  private suspend fun convertAllBooksToM4b(overwrite: Boolean = false) {
+  private fun convertAllBooksToM4b(processingLimitSemaphore: Semaphore, overwrite: Boolean = false) {
     val localLibrary = getLibrary()
-
+    val scope = CoroutineScope(Dispatchers.IO)
     localLibrary.audiobooks
       .let {
         if (devMode) {
@@ -259,8 +273,15 @@ class Run : CliktCommand("run") {
           it
         }
       }
-      .forEach { book ->
-        convertBookToM4b(book, overwrite)
+      .map { book ->
+        scope.launch {
+          processingLimitSemaphore.acquire()
+          try {
+            convertBookToM4b(book, overwrite)
+          } finally {
+            processingLimitSemaphore.release()
+          }
+        }
       }
   }
 
