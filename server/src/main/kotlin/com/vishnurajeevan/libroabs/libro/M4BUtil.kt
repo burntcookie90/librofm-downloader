@@ -23,7 +23,7 @@ class M4BUtil(
 
   private val ffprobe = FFprobe(ffprobePath)
 
-  suspend fun convertBookToM4b(book: Book, tracks: List<Tracks>, targetDirectory: File, quality: String) {
+  suspend fun convertBookToM4b(book: Book, tracks: List<Tracks>, targetDirectory: File, audioQuality: String) {
     val newFile = File(targetDirectory, "${book.title}.m4b")
 
     // Download Cover Image
@@ -54,7 +54,7 @@ class M4BUtil(
       .addInput(coverFile.absolutePath)
       .addOutput(newFile.absolutePath)
       .setAudioCodec("aac")
-      .addExtraArgs("-b:a", quality)
+      .addExtraArgs("-b:a", audioQuality)
       .addExtraArgs("-movflags", "faststart")
       .addExtraArgs("-map", "0:a") // Audio from MP3s
       .addExtraArgs("-map_metadata", "1")
