@@ -41,7 +41,8 @@ ENV \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
     DEV_MODE="false" \
-    SYNC_INTERVAL="d"
+    SYNC_INTERVAL="d" \
+    AUDIO_QUALITY="128k"
 
 WORKDIR /app
 COPY scripts/run.sh ./
