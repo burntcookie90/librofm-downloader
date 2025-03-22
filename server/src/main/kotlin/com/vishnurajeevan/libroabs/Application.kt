@@ -125,6 +125,7 @@ class Run : CliktCommand("run") {
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
         format: $format
+        audioQuality: $audioQuality
         ffmpegPath: $ffmpegPath
         ffprobePath: $ffprobePath
         verbose: $verbose
