@@ -68,6 +68,9 @@ class Run : CliktCommand("run") {
     .enum<BookFormat>()
     .default(BookFormat.MP3)
 
+  private val seriesDirectory by option("--series-directory", envvar="SERIES_DIRECTORY")
+    .flag(default = false)
+
   private val ffmpegPath by option("--ffmpeg-path")
     .default("/usr/bin/ffmpeg")
 
@@ -314,7 +317,13 @@ class Run : CliktCommand("run") {
   }
 
   private fun targetDir(book: Book): File {
-    val targetDir = File("$mediaDir/${book.authors.first()}/${book.title}")
+    if (book.series != null && seriesDirectory) {
+      val targetDir = File("$mediaDir/${book.authors.first()}/${book.series}/${book.title}")
+    }
+    else {
+      val targetDir = File("$mediaDir/${book.authors.first()}/${book.title}")
+    }
+
     return targetDir
   }
 }

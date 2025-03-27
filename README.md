@@ -36,5 +36,5 @@ services:
       - VERBOSE=true
       - RENAME_CHAPTERS=true
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
-      - SYNC_INTERVAL="h/d/w" #choose one
+      - SYNC_INTERVAL=h/d/w #choose one
 ```
