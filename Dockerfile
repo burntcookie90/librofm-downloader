@@ -42,6 +42,7 @@ ENV \
     WRITE_TITLE_TAG="false" \
     DEV_MODE="false" \
     SYNC_INTERVAL="d" \
+    AUDIO_QUALITY="128k" \
     PARALLEL_PROCESSING_LIMIT=5 \
     JAVA_OPTS="-Xmx4G"
 
