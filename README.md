@@ -10,6 +10,11 @@ The tool is set to recheck the library every day and download new books. Books w
 Enable `RENAME_CHAPTERS` to rename files from `Track - #.mp3` to `### <Book Title> - <Chapter Title>` as provided by libro.fm
 Additionally, if you enable `WRITE_TITLE_TAG`, each track's ID3 `title` field will be set to `### <Chapter Title>` as provided by libro.fm.
 
+### M4B Transcode
+Pass `M4B` as the `FORMAT` environment variable to have the service transcode and package the downloaded MP3 files to a single M4B file.
+
+Use `AUDIO_QUALITY` with an `ffmpeg` valid quality to control the transcode quality. Default is `128k`
+
 ### API Server
 After the initial download of your library, the container will run a API server.
 Bind a host port to `8080` to access the services.
@@ -37,4 +42,6 @@ services:
       - RENAME_CHAPTERS=true
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
       - SYNC_INTERVAL="h/d/w" #choose one
+      - FORMAT=MP3/M4B/Both #choose one
+      - AUDIO_QUALITY=128k
 ```
