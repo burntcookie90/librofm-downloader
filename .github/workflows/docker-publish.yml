@@ -48,6 +48,11 @@ jobs:
         with:
           cosign-release: 'v2.2.4'
 
+      # Set up QEMU static binary support for multi-platform builds
+      # https://github.com/docker/setup-qemu-action
+      - name: Set up Docker QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
       # https://github.com/docker/setup-buildx-action
@@ -79,6 +84,7 @@ jobs:
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
