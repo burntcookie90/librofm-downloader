@@ -68,6 +68,9 @@ class Run : CliktCommand("run") {
     .enum<BookFormat>()
     .default(BookFormat.MP3)
 
+  private val audioQuality: String by option("--audio-quality", envvar = "AUDIO_QUALITY")
+    .default("128k")
+
   private val ffmpegPath by option("--ffmpeg-path")
     .default("/usr/bin/ffmpeg")
 
@@ -122,6 +125,7 @@ class Run : CliktCommand("run") {
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
         format: $format
+        audioQuality: $audioQuality
         ffmpegPath: $ffmpegPath
         ffprobePath: $ffprobePath
         verbose: $verbose
@@ -305,7 +309,7 @@ class Run : CliktCommand("run") {
     }
 
     lfdLogger("Converting ${book.title} from mp3 to m4b.")
-    m4bUtil.convertBookToM4b(book, downloadMetaData.tracks, targetDir)
+    m4bUtil.convertBookToM4b(book, downloadMetaData.tracks, targetDir, audioQuality)
 
     if (format == BookFormat.M4B) {
       lfdLogger("Deleting obsolete mp3 files for ${book.title}")
