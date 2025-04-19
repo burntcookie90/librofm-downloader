@@ -27,7 +27,6 @@ LABEL maintainer="Vishnu Rajeevan <github@vishnu.email>"
 RUN apk add --no-cache \
       bash \
       curl \
-      ffmpeg \
       tini \
  && rm -rf /var/cache/* \
  && mkdir /var/cache/apk
@@ -37,12 +36,11 @@ ENV \
     LIBRO_FM_PASSWORD="" \
     DRY_RUN="false" \
     VERBOSE="false" \
-    FORMAT="MP3" \
+    FORMAT="M4B" \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
     DEV_MODE="false" \
-    SYNC_INTERVAL="d" \
-    AUDIO_QUALITY="128k"
+    SYNC_INTERVAL="d"
 
 WORKDIR /app
 COPY scripts/run.sh ./

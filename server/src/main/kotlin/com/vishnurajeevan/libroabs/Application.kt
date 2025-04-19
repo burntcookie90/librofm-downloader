@@ -19,7 +19,6 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import io.ktor.util.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,9 +26,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
-import net.bramp.ffmpeg.FFmpeg
-import net.bramp.ffmpeg.FFmpegExecutor
-import net.bramp.ffmpeg.FFprobe
 import java.io.File
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -68,15 +64,6 @@ class Run : CliktCommand("run") {
     .enum<BookFormat>()
     .default(BookFormat.MP3)
 
-  private val audioQuality: String by option("--audio-quality", envvar = "AUDIO_QUALITY")
-    .default("128k")
-
-  private val ffmpegPath by option("--ffmpeg-path")
-    .default("/usr/bin/ffmpeg")
-
-  private val ffprobePath by option("--ffprobe-path")
-    .default("/usr/bin/ffprobe")
-
   private val verbose by option("--verbose", "-v", envvar = "VERBOSE")
     .flag(default = false)
 
@@ -96,20 +83,13 @@ class Run : CliktCommand("run") {
     }
   }
 
-  private val libroFmApi by lazy {
+  private val libroClient by lazy {
     LibroApiHandler(
       client = HttpClient { },
       dataDir = dataDir,
       dryRun = dryRun,
       verbose = verbose,
       lfdLogger = lfdLogger
-    )
-  }
-
-  private val m4bUtil by lazy {
-    M4BUtil(
-      ffprobePath = ffprobePath,
-      executor = FFmpegExecutor(FFmpeg(ffmpegPath), FFprobe(ffprobePath))
     )
   }
 
@@ -125,10 +105,8 @@ class Run : CliktCommand("run") {
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
         format: $format
-        audioQuality: $audioQuality
-        ffmpegPath: $ffmpegPath
-        ffprobePath: $ffprobePath
         verbose: $verbose
+        devMode: $devMode
         libroFmUsername: $libroFmUsername
         libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}
       """.trimIndent()
@@ -143,10 +121,10 @@ class Run : CliktCommand("run") {
       val tokenFile = File("$dataDir/token.txt")
       if (!tokenFile.exists()) {
         lfdLogger("Token file not found, logging in")
-        libroFmApi.fetchLoginData(libroFmUsername, libroFmPassword)
+        libroClient.fetchLoginData(libroFmUsername, libroFmPassword)
       }
 
-      libroFmApi.fetchLibrary()
+      libroClient.fetchLibrary()
       processLibrary()
 
       launch {
@@ -161,7 +139,7 @@ class Run : CliktCommand("run") {
         Clock.System.intervalPulse(syncIntervalTimeUnit)
           .beat { _, _ ->
             lfdLogger("Checking library on pulse!")
-            libroFmApi.fetchLibrary()
+            libroClient.fetchLibrary()
             processLibrary()
           }
       }
@@ -175,20 +153,8 @@ class Run : CliktCommand("run") {
             routing {
               post("/update") {
                 call.respondText("Updating!")
-                libroFmApi.fetchLibrary()
+                libroClient.fetchLibrary()
                 processLibrary()
-              }
-              post("/convertToM4b/{isbn}") {
-                call.parameters["isbn"]?.let { isbn ->
-                  val overwrite = !call.queryParameters["overwrite"].isNullOrBlank()
-                  if (isbn == "all") {
-                    call.respondText("Starting conversion process for all books in the library" + if (overwrite) " and overwriting existing books" else "")
-                    convertAllBooksToM4b(overwrite)
-                  } else {
-                    call.respondText("Starting conversion process for $isbn" + if (overwrite) " and overwriting existing book" else "")
-                    convertBookToM4b(isbn, overwrite)
-                  }
-                }
               }
             }
           }
@@ -220,19 +186,25 @@ class Run : CliktCommand("run") {
         if (!targetDir.exists()) {
           lfdLogger("downloading ${book.title}")
           targetDir.mkdirs()
-          val downloadData = downloadBook(book, targetDir)
+          when (format) {
+            BookFormat.MP3 -> {
+              val downloadData = downloadBookAsMp3s(book, targetDir)
 
-          if (renameChapters) {
-            libroFmApi.renameChapters(
-              title = book.title,
-              tracks = downloadData.tracks,
-              targetDirectory = targetDir,
-              writeTitleTag = writeTitleTag
-            )
-          }
-          if (format == BookFormat.M4B || format == BookFormat.Both) {
-            lfdLogger("Converting ${book.title} from mp3 to m4b.")
-            convertBookToM4b(book)
+              if (renameChapters) {
+                libroClient.renameChapters(
+                  title = book.title,
+                  tracks = downloadData.tracks,
+                  targetDirectory = targetDir,
+                  writeTitleTag = writeTitleTag
+                )
+              }
+            }
+            BookFormat.M4B -> {
+              downloadBookAsM4b(
+                book = book,
+                targetDir = targetDir
+              )
+            }
           }
         } else {
           lfdLogger("skipping ${book.title} as it exists on the filesystem!")
@@ -240,81 +212,24 @@ class Run : CliktCommand("run") {
       }
   }
 
-  private suspend fun downloadBook(
+  private suspend fun downloadBookAsMp3s(
     book: Book,
     targetDir: File
-  ): DownloadMetadata {
-    val downloadData = libroFmApi.fetchDownloadMetadata(book.isbn)
-    libroFmApi.fetchAudioBook(
+  ): Mp3DownloadMetadata {
+    val downloadData = libroClient.fetchMp3DownloadMetadata(book.isbn)
+    libroClient.downloadMp3s(
       data = downloadData.parts,
       targetDirectory = targetDir
     )
     return downloadData
   }
 
-  private suspend fun convertAllBooksToM4b(overwrite: Boolean = false) {
-    val localLibrary = getLibrary()
-
-    localLibrary.audiobooks
-      .let {
-        if (devMode) {
-          it.take(1)
-        } else {
-          it
-        }
-      }
-      .forEach { book ->
-        convertBookToM4b(book, overwrite)
-      }
-  }
-
-  private suspend fun convertBookToM4b(isbn: String, overwrite: Boolean = false) {
-    val localLibrary = getLibrary()
-    val book = localLibrary.audiobooks.find { it.isbn == isbn }
-    if (book == null) {
-      lfdLogger("Book with isbn $isbn not found!")
-    } else {
-      convertBookToM4b(book, overwrite)
-    }
-  }
-
-  private suspend fun convertBookToM4b(book: Book, overwrite: Boolean = false) {
-    val targetDir = targetDir(book)
-    var downloadMetaData: DownloadMetadata? = null
-
-    // Check that book is downloaded and Mp3s are present
-    if (!targetDir.exists()) {
-      lfdLogger("Book ${book.title} is not downloaded yet!")
-      targetDir.mkdirs()
-      downloadMetaData = downloadBook(book, targetDir)
-    }
-
-    if (!overwrite) {
-      val targetFile = targetDir.combineSafe("${book.title}.m4b")
-      if (targetFile.exists()) {
-        lfdLogger("Skipping ${book.title} as it's already converted!")
-        return
-      }
-    }
-
-    val chapterFiles =
-      targetDir.listFiles { file -> file.extension == "mp3" }
-    if (chapterFiles == null || chapterFiles.isEmpty()) {
-      lfdLogger("Book ${book.title} does not have mp3 files downloaded. Downloading the book again.")
-      downloadMetaData = downloadBook(book, targetDir)
-    }
-
-    if (downloadMetaData == null) {
-      downloadMetaData = libroFmApi.fetchDownloadMetadata(book.isbn)
-    }
-
-    lfdLogger("Converting ${book.title} from mp3 to m4b.")
-    m4bUtil.convertBookToM4b(book, downloadMetaData.tracks, targetDir, audioQuality)
-
-    if (format == BookFormat.M4B) {
-      lfdLogger("Deleting obsolete mp3 files for ${book.title}")
-      libroFmApi.deleteMp3Files(targetDir)
-    }
+  private suspend fun downloadBookAsM4b(
+    book: Book,
+    targetDir: File
+  ) {
+    val m4bMetadata = libroClient.fetchM4bMetadata(book.isbn)
+    libroClient.downloadM4b(m4bMetadata.m4b_url, targetDir)
   }
 
   private fun targetDir(book: Book): File {

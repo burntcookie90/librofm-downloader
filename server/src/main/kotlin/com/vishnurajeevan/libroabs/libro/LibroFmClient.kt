@@ -1,23 +1,17 @@
 package com.vishnurajeevan.libroabs.libro
 
 import de.jensklingenberg.ktorfit.Ktorfit
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.client.request.get
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readAvailable
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
@@ -42,7 +36,7 @@ class LibroApiHandler(
         contentType(ContentType.Application.Json)
       }
       install(Logging) {
-        logger = object: Logger {
+        logger = object : Logger {
           override fun log(message: String) {
             lfdLogger(message)
           }
@@ -64,7 +58,7 @@ class LibroApiHandler(
       requestTimeoutMillis = 5 * 60 * 1000
     }
     install(Logging) {
-      logger = object: Logger {
+      logger = object : Logger {
         override fun log(message: String) {
           lfdLogger(message)
         }
@@ -88,8 +82,7 @@ class LibroApiHandler(
       file.printWriter().use {
         it.write(tokenData.access_token!!)
       }
-    }
-    else {
+    } else {
       println("Login failed!")
       throw IllegalArgumentException("failed login!")
     }
@@ -102,30 +95,33 @@ class LibroApiHandler(
     }
   }
 
-  suspend fun fetchDownloadMetadata(isbn: String): DownloadMetadata {
+  suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata {
     return libroAPI.fetchDownloadMetadata("Bearer $authToken", isbn)
   }
 
-  suspend fun fetchAudioBook(data: List<DownloadPart>, targetDirectory: File) {
+  suspend fun fetchM4bMetadata(isbn: String): M4bMetadata = libroAPI.fetchM4BMetadata("Bearer $authToken", isbn)
+
+  suspend fun downloadM4b(m4bUrl: String, targetDirectory: File) {
+    if (!dryRun) {
+      lfdLogger("Downloading M4B: $m4bUrl")
+      val url = Url(m4bUrl)
+      val contentDisposition = url.parameters["response-content-disposition"]!!
+
+      val filenameRegex = "filename=\"?([^\"]+)\"?".toRegex()
+      val match = filenameRegex.find(contentDisposition)
+
+      val filename = match?.groupValues?.getOrNull(1)?.replace("+", " ")
+      downloadFile(url, File(targetDirectory, filename!!))
+    }
+  }
+
+  suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File) {
     data.forEachIndexed { index, part ->
       if (!dryRun) {
         val url = part.url
         lfdLogger("downloading part ${index + 1}")
         val destinationFile = File(targetDirectory, "part-$index.zip")
-        val response = downloadClient.get(url)
-
-        val input = response.body<ByteReadChannel>()
-        FileOutputStream(destinationFile).use { output ->
-          val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-
-          while (true) {
-            val bytesRead = input.readAvailable(buffer)
-            if (bytesRead == -1) break
-
-            output.write(buffer, 0, bytesRead)
-          }
-          output.flush()
-        }
+        downloadFile(Url(url), destinationFile)
 
         ZipInputStream(destinationFile.inputStream()).use { zipIn ->
           var entry = zipIn.nextEntry
@@ -135,8 +131,7 @@ class LibroApiHandler(
             if (entry.isDirectory) {
               // Create directory
               entryPath.createDirectories()
-            }
-            else {
+            } else {
               // Ensure parent directory exists
               entryPath.parent?.createDirectories()
 
@@ -152,6 +147,28 @@ class LibroApiHandler(
         }
         destinationFile.delete()
       }
+    }
+  }
+
+  private suspend fun downloadFile(url: Url, destinationFile: File) {
+    lfdLogger("""
+      ----
+      Downloading $url to ${destinationFile.name}
+      ----
+    """.trimIndent())
+    val response = downloadClient.get(url)
+
+    val input = response.body<ByteReadChannel>()
+    FileOutputStream(destinationFile).use { output ->
+      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+
+      while (true) {
+        val bytesRead = input.readAvailable(buffer)
+        if (bytesRead == -1) break
+
+        output.write(buffer, 0, bytesRead)
+      }
+      output.flush()
     }
   }
 
@@ -187,6 +204,6 @@ class LibroApiHandler(
 
   suspend fun deleteMp3Files(targetDirectory: File) = withContext(Dispatchers.IO) {
     targetDirectory.listFiles { file -> file.extension == "mp3" }
-        ?.forEach { it.delete() }
+      ?.forEach { it.delete() }
   }
 }
