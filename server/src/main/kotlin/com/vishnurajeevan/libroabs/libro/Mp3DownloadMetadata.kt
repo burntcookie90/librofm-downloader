@@ -3,7 +3,7 @@ package com.vishnurajeevan.libroabs.libro
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class DownloadMetadata(
+data class Mp3DownloadMetadata(
   val parts: List<DownloadPart>,
   val tracks: List<Tracks>
 )

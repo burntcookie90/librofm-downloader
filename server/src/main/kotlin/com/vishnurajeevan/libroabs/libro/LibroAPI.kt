@@ -24,5 +24,12 @@ interface LibroAPI {
   suspend fun fetchDownloadMetadata(
     @Header("Authorization") authToken: String,
     @Query("isbn") isbn: String
-  ): DownloadMetadata
+  ): Mp3DownloadMetadata
+
+  @GET("api/v10/audiobooks/{isbn}/packaged_m4b")
+  suspend fun fetchM4BMetadata(
+    @Header("Authorization") authToken: String,
+    @Path("isbn") isbn: String
+  ): M4bMetadata
+
 }

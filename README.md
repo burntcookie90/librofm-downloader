@@ -4,16 +4,17 @@ Small tool for checking your [libro.fm](https://libro.fm) library and downloadin
 
 The tool is set to recheck the library every day and download new books. Books will be skipped if the `Author Name/Book Name` folder already exists.
 
-## Extra Features
+## Features
 
-### Rename Chapters
+---
+### Format
+- Select from either `MP3` or `M4B` downloads. `M4B` is the default
+
+
+#### MP3 - Extra - Rename Chapters / Write Title Tag
 Enable `RENAME_CHAPTERS` to rename files from `Track - #.mp3` to `### <Book Title> - <Chapter Title>` as provided by libro.fm
 Additionally, if you enable `WRITE_TITLE_TAG`, each track's ID3 `title` field will be set to `### <Chapter Title>` as provided by libro.fm.
-
-### M4B Transcode
-Pass `M4B` as the `FORMAT` environment variable to have the service transcode and package the downloaded MP3 files to a single M4B file.
-
-Use `AUDIO_QUALITY` with an `ffmpeg` valid quality to control the transcode quality. Default is `128k`
+----
 
 ### API Server
 After the initial download of your library, the container will run a API server.
@@ -36,12 +37,12 @@ services:
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
+      - FORMAT=MP3/M4B #choose one
       # extra optional: setting these enables them, dont add them if you dont want them.
       - DRY_RUN=true 
       - VERBOSE=true
-      - RENAME_CHAPTERS=true
-      - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
       - SYNC_INTERVAL="h/d/w" #choose one
-      - FORMAT=MP3/M4B/Both #choose one
-      - AUDIO_QUALITY=128k
+      # MP3 only
+      - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
+      - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
 ```
