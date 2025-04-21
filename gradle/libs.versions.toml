@@ -9,7 +9,7 @@ kotlin = "2.1.20"
 kotlinxSerialization = "2.1.20"
 kotlinxIo = "0.7.0"
 ktor = "3.0.0"
-ktorfit = "2.5.0"
+ktorfit = "2.5.1"
 logback = "1.5.18"
 
 [libraries]
