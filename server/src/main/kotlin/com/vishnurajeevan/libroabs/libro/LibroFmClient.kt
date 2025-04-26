@@ -2,6 +2,7 @@ package com.vishnurajeevan.libroabs.libro
 
 import com.vishnurajeevan.libroabs.ApplicationLogLevel
 import de.jensklingenberg.ktorfit.Ktorfit
+import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -10,6 +11,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.plugins.NotFoundException
 import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -56,6 +58,7 @@ class LibroApiHandler(
         })
       }
     })
+    .converterFactories(ResponseConverterFactory())
     .build()
 
   private val downloadClient = client.config {
@@ -108,7 +111,15 @@ class LibroApiHandler(
     return libroAPI.fetchDownloadMetadata("Bearer $authToken", isbn)
   }
 
-  suspend fun fetchM4bMetadata(isbn: String): M4bMetadata = libroAPI.fetchM4BMetadata("Bearer $authToken", isbn)
+  suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
+    val response = libroAPI.fetchM4BMetadata("Bearer $authToken", isbn)
+    return if (response.isSuccessful) {
+      Result.success(response.body()!!)
+    }
+    else {
+      Result.failure(Exception("M4B Not Found!"))
+    }
+  }
 
   suspend fun downloadM4b(m4bUrl: String, targetDirectory: File) {
     if (!dryRun) {

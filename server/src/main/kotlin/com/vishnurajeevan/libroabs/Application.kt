@@ -197,27 +197,21 @@ class Run : CliktCommand("run") {
           val targetDir = targetDir(book)
 
           if (!targetDir.exists()) {
-            lfdLogger("downloading ${book.title}")
+            lfdLogger("Downloading ${book.title}")
             targetDir.mkdirs()
             when (format) {
               BookFormat.MP3 -> {
-                val downloadData = downloadBookAsMp3s(book, targetDir)
-
-                if (renameChapters) {
-                  libroClient.renameChapters(
-                    title = book.title,
-                    tracks = downloadData.tracks,
-                    targetDirectory = targetDir,
-                    writeTitleTag = writeTitleTag
-                  )
-                }
+                downloadMp3sAndRename(book, targetDir)
               }
 
               BookFormat.M4B -> {
                 downloadBookAsM4b(
                   book = book,
                   targetDir = targetDir
-                )
+                ).onFailure {
+                  lfdLogger("M4B download for ${book.title} failed, falling back to MP3")
+                  downloadMp3sAndRename(book, targetDir)
+                }
               }
             }
           } else {
@@ -225,6 +219,19 @@ class Run : CliktCommand("run") {
           }
         }
       }
+  }
+
+  private suspend fun downloadMp3sAndRename(book: Book, targetDir: File) {
+    val downloadData = downloadBookAsMp3s(book, targetDir)
+
+    if (renameChapters) {
+      libroClient.renameChapters(
+        title = book.title,
+        tracks = downloadData.tracks,
+        targetDirectory = targetDir,
+        writeTitleTag = writeTitleTag
+      )
+    }
   }
 
   private suspend fun downloadBookAsMp3s(
@@ -242,9 +249,14 @@ class Run : CliktCommand("run") {
   private suspend fun downloadBookAsM4b(
     book: Book,
     targetDir: File
-  ) {
+  ): Result<Unit> {
     val m4bMetadata = libroClient.fetchM4bMetadata(book.isbn)
-    libroClient.downloadM4b(m4bMetadata.m4b_url, targetDir)
+    if (m4bMetadata.isSuccess) {
+      libroClient.downloadM4b(m4bMetadata.getOrThrow().m4b_url, targetDir)
+      return Result.success(Unit)
+    } else {
+      return Result.failure(Exception("M4B Not Found"))
+    }
   }
 
   private fun targetDir(book: Book): File {

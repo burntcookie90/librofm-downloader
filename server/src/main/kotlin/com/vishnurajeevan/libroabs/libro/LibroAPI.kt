@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.libro
 
+import de.jensklingenberg.ktorfit.Response
 import de.jensklingenberg.ktorfit.http.*
 import io.ktor.client.request.HttpRequestBuilder
 
@@ -31,6 +32,6 @@ interface LibroAPI {
   suspend fun fetchM4BMetadata(
     @Header("Authorization") authToken: String,
     @Path("isbn") isbn: String,
-  ): M4bMetadata
+  ): Response<M4bMetadata>
 
 }
