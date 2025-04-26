@@ -37,10 +37,10 @@ services:
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
-      - FORMAT=MP3/M4B #choose one
+      - FORMAT="MP3/M4B" #choose one
       # extra optional: setting these enables them, dont add them if you dont want them.
       - DRY_RUN=true 
-      - VERBOSE=true
+      - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
       # MP3 only
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm

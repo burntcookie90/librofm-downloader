@@ -36,6 +36,10 @@ fun main(args: Array<String>) {
     .main(args)
 }
 
+enum class ApplicationLogLevel {
+  NONE, INFO, VERBOSE
+}
+
 class Run : CliktCommand("run") {
   private val port by option("--port")
     .int()
@@ -61,15 +65,16 @@ class Run : CliktCommand("run") {
     .flag(default = false)
 
   private val format: BookFormat by option("--format", envvar = "FORMAT")
-    .enum<BookFormat>()
+    .enum<BookFormat>(ignoreCase = true)
     .default(BookFormat.MP3)
 
   private val parallelCount by option("--parallel-count", envvar = "PARALLEL_COUNT")
     .int()
     .default(1)
 
-  private val verbose by option("--verbose", "-v", envvar = "VERBOSE")
-    .flag(default = false)
+  private val logLevel: ApplicationLogLevel by option("--log-level", envvar = "LOG_LEVEL")
+    .enum<ApplicationLogLevel>(ignoreCase = true)
+    .default(ApplicationLogLevel.NONE)
 
   // Limits the number of books pulled down to 1
   private val devMode by option("--dev-mode", "-d", envvar = "DEV_MODE")
@@ -82,8 +87,9 @@ class Run : CliktCommand("run") {
     .required()
 
   private val lfdLogger: (String) -> Unit = {
-    if (verbose) {
-      println(it)
+    when (logLevel) {
+      ApplicationLogLevel.INFO, ApplicationLogLevel.VERBOSE -> println(it)
+      else -> {}
     }
   }
 
@@ -92,13 +98,13 @@ class Run : CliktCommand("run") {
       client = HttpClient { },
       dataDir = dataDir,
       dryRun = dryRun,
-      verbose = verbose,
+      logLevel = logLevel,
       lfdLogger = lfdLogger
     )
   }
 
   private val serverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-  private val applicationScope = CoroutineScope(Dispatchers.IO.limitedParallelism(parallelCount) + SupervisorJob())
+  private val applicationScope by lazy { CoroutineScope(Dispatchers.IO.limitedParallelism(parallelCount) + SupervisorJob()) }
 
   override fun run() {
     println(
@@ -111,7 +117,7 @@ class Run : CliktCommand("run") {
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
         format: $format
-        verbose: $verbose
+        logLevel: $logLevel
         devMode: $devMode
         libroFmUsername: $libroFmUsername
         libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}

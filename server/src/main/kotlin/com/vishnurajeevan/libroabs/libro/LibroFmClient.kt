@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.libro
 
+import com.vishnurajeevan.libroabs.ApplicationLogLevel
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -27,7 +28,7 @@ class LibroApiHandler(
   private val dataDir: String,
   private val dryRun: Boolean,
   private val lfdLogger: (String) -> Unit = {},
-  verbose: Boolean,
+  logLevel: ApplicationLogLevel,
 ) {
   private val ktorfit = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
@@ -42,7 +43,11 @@ class LibroApiHandler(
           }
 
         }
-        level = if (verbose) LogLevel.INFO else LogLevel.NONE
+        level = when(logLevel) {
+          ApplicationLogLevel.NONE -> LogLevel.NONE
+          ApplicationLogLevel.INFO -> LogLevel.INFO
+          ApplicationLogLevel.VERBOSE -> LogLevel.ALL
+        }
       }
       install(ContentNegotiation) {
         json(Json {
@@ -64,7 +69,11 @@ class LibroApiHandler(
         }
 
       }
-      level = if (verbose) LogLevel.INFO else LogLevel.NONE
+      level = when(logLevel) {
+        ApplicationLogLevel.NONE -> LogLevel.NONE
+        ApplicationLogLevel.INFO -> LogLevel.INFO
+        ApplicationLogLevel.VERBOSE -> LogLevel.ALL
+      }
     }
   }
 

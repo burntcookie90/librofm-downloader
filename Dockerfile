@@ -35,7 +35,7 @@ ENV \
     LIBRO_FM_USERNAME="" \
     LIBRO_FM_PASSWORD="" \
     DRY_RUN="false" \
-    VERBOSE="false" \
+    LOG_LEVEL="NONE" \
     FORMAT="M4B" \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
