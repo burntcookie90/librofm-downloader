@@ -42,6 +42,7 @@ services:
       - DRY_RUN=true 
       - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
+      - LIMIT="1"
       # MP3 only
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well

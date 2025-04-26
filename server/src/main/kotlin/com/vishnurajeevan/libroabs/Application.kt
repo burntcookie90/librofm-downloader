@@ -76,9 +76,9 @@ class Run : CliktCommand("run") {
     .enum<ApplicationLogLevel>(ignoreCase = true)
     .default(ApplicationLogLevel.NONE)
 
-  // Limits the number of books pulled down to 1
-  private val devMode by option("--dev-mode", "-d", envvar = "DEV_MODE")
-    .flag(default = false)
+  private val limit by option("--limit", envvar = "LIMIT")
+    .int()
+    .default(-1)
 
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
@@ -118,7 +118,7 @@ class Run : CliktCommand("run") {
         writeTitleTag: $writeTitleTag
         format: $format
         logLevel: $logLevel
-        devMode: $devMode
+        limit: $limit
         libroFmUsername: $libroFmUsername
         libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}
       """.trimIndent()
@@ -186,10 +186,10 @@ class Run : CliktCommand("run") {
 
     localLibrary.audiobooks
       .let {
-        if (devMode) {
-          it.take(1)
-        } else {
+        if (limit == -1) {
           it
+        } else {
+          it.take(limit)
         }
       }
       .forEach { book ->

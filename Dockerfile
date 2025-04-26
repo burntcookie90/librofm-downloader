@@ -39,7 +39,7 @@ ENV \
     FORMAT="M4B" \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
-    DEV_MODE="false" \
+    LIMIT="-1" \
     SYNC_INTERVAL="d" \
     PARALLEL_COUNT=1
 
