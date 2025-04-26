@@ -64,6 +64,10 @@ class Run : CliktCommand("run") {
     .enum<BookFormat>()
     .default(BookFormat.MP3)
 
+  private val parallelCount by option("--parallel-count", envvar = "PARALLEL_COUNT")
+    .int()
+    .default(1)
+
   private val verbose by option("--verbose", "-v", envvar = "VERBOSE")
     .flag(default = false)
 
@@ -94,6 +98,7 @@ class Run : CliktCommand("run") {
   }
 
   private val serverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+  private val applicationScope = CoroutineScope(Dispatchers.IO.limitedParallelism(parallelCount) + SupervisorJob())
 
   override fun run() {
     println(
@@ -101,6 +106,7 @@ class Run : CliktCommand("run") {
         Starting up!
         internal port: $port
         syncInterval: $syncInterval
+        parallelCount: $parallelCount
         dryRun: $dryRun
         renameChapters: $renameChapters
         writeTitleTag: $writeTitleTag
@@ -181,33 +187,36 @@ class Run : CliktCommand("run") {
         }
       }
       .forEach { book ->
-        val targetDir = targetDir(book)
+        applicationScope.launch {
+          val targetDir = targetDir(book)
 
-        if (!targetDir.exists()) {
-          lfdLogger("downloading ${book.title}")
-          targetDir.mkdirs()
-          when (format) {
-            BookFormat.MP3 -> {
-              val downloadData = downloadBookAsMp3s(book, targetDir)
+          if (!targetDir.exists()) {
+            lfdLogger("downloading ${book.title}")
+            targetDir.mkdirs()
+            when (format) {
+              BookFormat.MP3 -> {
+                val downloadData = downloadBookAsMp3s(book, targetDir)
 
-              if (renameChapters) {
-                libroClient.renameChapters(
-                  title = book.title,
-                  tracks = downloadData.tracks,
-                  targetDirectory = targetDir,
-                  writeTitleTag = writeTitleTag
+                if (renameChapters) {
+                  libroClient.renameChapters(
+                    title = book.title,
+                    tracks = downloadData.tracks,
+                    targetDirectory = targetDir,
+                    writeTitleTag = writeTitleTag
+                  )
+                }
+              }
+
+              BookFormat.M4B -> {
+                downloadBookAsM4b(
+                  book = book,
+                  targetDir = targetDir
                 )
               }
             }
-            BookFormat.M4B -> {
-              downloadBookAsM4b(
-                book = book,
-                targetDir = targetDir
-              )
-            }
+          } else {
+            lfdLogger("skipping ${book.title} as it exists on the filesystem!")
           }
-        } else {
-          lfdLogger("skipping ${book.title} as it exists on the filesystem!")
         }
       }
   }

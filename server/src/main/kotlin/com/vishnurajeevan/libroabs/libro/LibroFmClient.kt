@@ -42,7 +42,7 @@ class LibroApiHandler(
           }
 
         }
-        level = if (verbose) LogLevel.BODY else LogLevel.NONE
+        level = if (verbose) LogLevel.INFO else LogLevel.NONE
       }
       install(ContentNegotiation) {
         json(Json {

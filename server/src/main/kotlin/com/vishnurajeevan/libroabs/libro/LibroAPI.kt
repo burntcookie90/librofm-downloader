@@ -1,6 +1,7 @@
 package com.vishnurajeevan.libroabs.libro
 
 import de.jensklingenberg.ktorfit.http.*
+import io.ktor.client.request.HttpRequestBuilder
 
 interface LibroAPI {
   @POST("oauth/token")
@@ -29,7 +30,7 @@ interface LibroAPI {
   @GET("api/v10/audiobooks/{isbn}/packaged_m4b")
   suspend fun fetchM4BMetadata(
     @Header("Authorization") authToken: String,
-    @Path("isbn") isbn: String
+    @Path("isbn") isbn: String,
   ): M4bMetadata
 
 }

@@ -40,7 +40,8 @@ ENV \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
     DEV_MODE="false" \
-    SYNC_INTERVAL="d"
+    SYNC_INTERVAL="d" \
+    PARALLEL_COUNT=1
 
 WORKDIR /app
 COPY scripts/run.sh ./
