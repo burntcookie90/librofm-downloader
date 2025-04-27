@@ -14,8 +14,10 @@ The tool is set to recheck the library every day and download new books. Books w
 
 
 #### MP3 - Extra - Rename Chapters / Write Title Tag
+
 Enable `RENAME_CHAPTERS` to rename files from `Track - #.mp3` to `### <Book Title> - <Chapter Title>` as provided by libro.fm
 Additionally, if you enable `WRITE_TITLE_TAG`, each track's ID3 `title` field will be set to `### <Chapter Title>` as provided by libro.fm.
+
 ----
 
 ### API Server
