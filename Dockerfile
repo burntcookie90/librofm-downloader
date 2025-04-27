@@ -27,16 +27,18 @@ LABEL maintainer="Vishnu Rajeevan <github@vishnu.email>"
 RUN apk add --no-cache \
       bash \
       curl \
+      ffmpeg \
       tini \
  && rm -rf /var/cache/* \
  && mkdir /var/cache/apk
 
 ENV \
+    JAVA_OPTS="-Xmx4G" \
     LIBRO_FM_USERNAME="" \
     LIBRO_FM_PASSWORD="" \
     DRY_RUN="false" \
     LOG_LEVEL="NONE" \
-    FORMAT="M4B" \
+    FORMAT="M4B_MP3_FALLBACK" \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
     LIMIT="-1" \

@@ -8,7 +8,9 @@ The tool is set to recheck the library every day and download new books. Books w
 
 ---
 ### Format
-- Select from either `MP3` or `M4B` downloads. `M4B` is the default
+- Select from `MP3`, `M4B_MP3_FALLBACK` or `M4B_CONVERT_FALLBACK` formats. 
+- `M4B_MP3_FALLBACK` is the default, but can run into issues where libro.fm does not have a m4b packaged for the book. In that case we'll download MP3s.
+- `M4B_CONVERT_FALLBACK` will download MP3s and use ffmpeg to create an `M4B` file
 
 
 #### MP3 - Extra - Rename Chapters / Write Title Tag
@@ -37,9 +39,9 @@ services:
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
-      - FORMAT="MP3/M4B" #choose one
+      - FORMAT="MP3/M4B_MP3_FALLBACK/M4B_CONVERT_FALLBACK" #choose one
       # extra optional: setting these enables them, dont add them if you dont want them.
-      - DRY_RUN=true 
+      - PARALLEL_COUNT="5" #increase parallel processing limit, default is 1
       - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
       - LIMIT="1"
