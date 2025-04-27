@@ -2,6 +2,6 @@ package com.vishnurajeevan.libroabs
 
 enum class BookFormat {
   MP3,
-  M4B,
-  Both
+  M4B_CONVERT_FALLBACK,
+  M4B_MP3_FALLBACK
 }

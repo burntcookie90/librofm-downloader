@@ -4,16 +4,19 @@ Small tool for checking your [libro.fm](https://libro.fm) library and downloadin
 
 The tool is set to recheck the library every day and download new books. Books will be skipped if the `Author Name/Book Name` folder already exists.
 
-## Extra Features
+## Features
 
-### Rename Chapters
+---
+### Format
+- Select from `MP3`, `M4B_MP3_FALLBACK` or `M4B_CONVERT_FALLBACK` formats. 
+- `M4B_MP3_FALLBACK` is the default, but can run into issues where libro.fm does not have a m4b packaged for the book. In that case we'll download MP3s.
+- `M4B_CONVERT_FALLBACK` will download MP3s and use ffmpeg to create an `M4B` file
+
+
+#### MP3 - Extra - Rename Chapters / Write Title Tag
 Enable `RENAME_CHAPTERS` to rename files from `Track - #.mp3` to `### <Book Title> - <Chapter Title>` as provided by libro.fm
 Additionally, if you enable `WRITE_TITLE_TAG`, each track's ID3 `title` field will be set to `### <Chapter Title>` as provided by libro.fm.
-
-### M4B Transcode
-Pass `M4B` as the `FORMAT` environment variable to have the service transcode and package the downloaded MP3 files to a single M4B file.
-
-Use `AUDIO_QUALITY` with an `ffmpeg` valid quality to control the transcode quality. Default is `128k`
+----
 
 ### API Server
 After the initial download of your library, the container will run a API server.
@@ -36,12 +39,13 @@ services:
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
+      - FORMAT="MP3/M4B_MP3_FALLBACK/M4B_CONVERT_FALLBACK" #choose one
       # extra optional: setting these enables them, dont add them if you dont want them.
-      - DRY_RUN=true 
-      - VERBOSE=true
-      - RENAME_CHAPTERS=true
-      - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
+      - PARALLEL_COUNT="5" #increase parallel processing limit, default is 1
+      - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
-      - FORMAT=MP3/M4B/Both #choose one
-      - AUDIO_QUALITY=128k
+      - LIMIT="1"
+      # MP3 only
+      - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
+      - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
 ```

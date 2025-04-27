@@ -32,7 +32,7 @@ ktor-serialization-kotlinx = { module = "io.ktor:ktor-serialization-kotlinx-json
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 ktorfit-lib = { module = "de.jensklingenberg.ktorfit:ktorfit-lib", version.ref = "ktorfit" }
-ktorfit-call = { module = "de.jensklingenberg.ktorfit:ktorfit-converters-call", version.ref = "ktorfit" }
+ktorfit-response= { module = "de.jensklingenberg.ktorfit:ktorfit-converters-response", version.ref = "ktorfit" }
 
 [plugins]
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

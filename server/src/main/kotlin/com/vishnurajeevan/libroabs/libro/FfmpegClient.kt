@@ -15,7 +15,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
 
-class M4BUtil(
+class FfmpegClient(
   ffprobePath: String,
   private val executor: FFmpegExecutor,
   private val lfdLogger: (String) -> Unit = {},

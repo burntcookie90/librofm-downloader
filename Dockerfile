@@ -33,16 +33,17 @@ RUN apk add --no-cache \
  && mkdir /var/cache/apk
 
 ENV \
+    JAVA_OPTS="-Xmx4G" \
     LIBRO_FM_USERNAME="" \
     LIBRO_FM_PASSWORD="" \
     DRY_RUN="false" \
-    VERBOSE="false" \
-    FORMAT="MP3" \
+    LOG_LEVEL="NONE" \
+    FORMAT="M4B_MP3_FALLBACK" \
     RENAME_CHAPTERS="false" \
     WRITE_TITLE_TAG="false" \
-    DEV_MODE="false" \
+    LIMIT="-1" \
     SYNC_INTERVAL="d" \
-    AUDIO_QUALITY="128k"
+    PARALLEL_COUNT=1
 
 WORKDIR /app
 COPY scripts/run.sh ./
