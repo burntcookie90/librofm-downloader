@@ -41,9 +41,9 @@ services:
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
-      - FORMAT="MP3/M4B_MP3_FALLBACK/M4B_CONVERT_FALLBACK" #choose one
+      - FORMAT="MP3/M4B_MP3_FALLBACK/M4B_CONVERT_FALLBACK" #choose one `M4B_MP3_FALLBACK` is default
       # extra optional: setting these enables them, dont add them if you dont want them.
-      - PARALLEL_COUNT="5" #increase parallel processing limit, default is 1
+      - PARALLEL_COUNT="3" #increase parallel processing limit, default is 1
       - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
       - LIMIT="1"
