@@ -13,9 +13,12 @@ import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.vishnurajeevan.libroabs.libro.*
 import io.github.kevincianfarini.cardiologist.intervalPulse
 import io.ktor.client.HttpClient
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.html.respondHtml
 import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +29,15 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import kotlinx.html.body
+import kotlinx.html.button
+import kotlinx.html.head
+import kotlinx.html.id
+import kotlinx.html.onClick
+import kotlinx.html.p
+import kotlinx.html.script
+import kotlinx.html.title
+import kotlinx.html.unsafe
 import kotlinx.serialization.json.Json
 import net.bramp.ffmpeg.FFmpeg
 import net.bramp.ffmpeg.FFmpegExecutor
@@ -134,21 +146,21 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val processingSemaphore by lazy { Semaphore(parallelCount) }
 
   override suspend fun run() {
+    val serverRuntimeInfo = listOf(
+      "port: $port",
+      "syncInterval: $syncInterval",
+      "parallelCount: $parallelCount",
+      "dryRun: $dryRun",
+      "renameChapters: $renameChapters",
+      "writeTitleTag: $writeTitleTag",
+      "format: $format",
+      "logLevel: $logLevel",
+      "limit: $limit",
+      "libroFmUsername: $libroFmUsername",
+      "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
+    )
     println(
-      """
-        Starting up!
-        internal port: $port
-        syncInterval: $syncInterval
-        parallelCount: $parallelCount
-        dryRun: $dryRun
-        renameChapters: $renameChapters
-        writeTitleTag: $writeTitleTag
-        format: $format
-        logLevel: $logLevel
-        limit: $limit
-        libroFmUsername: $libroFmUsername
-        libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}
-      """.trimIndent()
+      serverRuntimeInfo.joinToString("\n")
     )
 
     val dataDir = File(dataDir).apply {
@@ -194,6 +206,38 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
             call.respondText("Updating!")
             libroClient.fetchLibrary()
             processLibrary()
+          }
+          get("/") {
+            call.respondHtml(HttpStatusCode.OK) {
+              head {
+                title {
+                  +"libro.fm Downloader"
+                }
+                script {
+                  unsafe {
+                    +"""
+                                    function callUpdateFunction() {
+                                        fetch('/update', {
+                                            method: 'POST'
+                                        });
+                                    }
+                                """.trimIndent()
+                  }
+                }
+              }
+              body {
+                serverRuntimeInfo.forEach {
+                  p {
+                    +it
+                  }
+                }
+                button {
+                  id = "updateButton"
+                  onClick = "callUpdateFunction()"
+                  +"Update Library"
+                }
+              }
+            }
           }
         }
       }
