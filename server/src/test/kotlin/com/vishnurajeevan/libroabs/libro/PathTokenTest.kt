@@ -115,4 +115,25 @@ class PathTokenTest {
     val expected = "Famous Author/Narrator One, Narrator Two, Narrator Three/Epic Tale"
     assertEquals(expected, File(multipleNarratorsBook.createPath(pathPattern)).path)
   }
+
+
+  @Test
+  fun testListOfBooksWithFullPathPattern() {
+    val pathPattern = "ALL_AUTHORS/FIRST_AUTHOR/ALL_NARRATORS/FIRST_NARRATOR/SERIES_NAME/ISBN/BOOK_TITLE"
+
+    assertEquals(
+      listOf(
+        "Jane Doe/Jane Doe/John Smith/John Smith/Amazing Series/1234567890/The Great Novel",
+        "John Doe, Jane Smith, Alex Johnson/John Doe/Voice Actor/Voice Actor/0987654321/Collaborative Work",
+        "Famous Author/Famous Author/Narrator One, Narrator Two, Narrator Three/Narrator One/Epic Series/5555555555/Epic Tale"
+      ),
+      listOf(
+        singleAuthorBook,
+        multipleAuthorsBook,
+        multipleNarratorsBook
+      ).map {
+        File(it.createPath(pathPattern)).path
+      }
+    )
+  }
 }
