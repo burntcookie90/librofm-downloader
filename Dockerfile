@@ -43,7 +43,8 @@ ENV \
     WRITE_TITLE_TAG="false" \
     LIMIT="-1" \
     SYNC_INTERVAL="d" \
-    PARALLEL_COUNT=1
+    PARALLEL_COUNT=1 \
+    PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE"
 
 WORKDIR /app
 COPY scripts/run.sh ./
