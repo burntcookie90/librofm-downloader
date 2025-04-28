@@ -2,7 +2,7 @@
 
 Small tool for checking your [libro.fm](https://libro.fm) library and downloading new books.
 
-The tool is set to recheck the library every day and download new books. Books will be skipped if the `Author Name/Book Name` folder already exists.
+The tool is set to recheck the library every day and download new books. Books will be skipped if the folder already exists.
 
 ## Features
 
