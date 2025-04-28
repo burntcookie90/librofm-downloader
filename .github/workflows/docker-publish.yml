@@ -9,12 +9,12 @@ on:
   schedule:
     - cron: '44 14 * * *'
   push:
-    branches: 
+    branches:
       - main
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: 
+    branches:
       - main
       - latest
 
@@ -26,8 +26,27 @@ env:
 
 
 jobs:
-  build:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Test
+        run: ./gradlew test
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read

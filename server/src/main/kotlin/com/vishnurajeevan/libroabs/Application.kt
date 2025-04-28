@@ -108,6 +108,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val ffprobePath by option("--ffprobe-path")
     .default("/usr/bin/ffprobe")
 
+  private val pathPattern by option("--path-pattern", envvar = "PATH_PATTERN")
+    .default("FIRST_AUTHOR/BOOK_TITLE")
+
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
 
@@ -156,6 +159,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       "format: $format",
       "logLevel: $logLevel",
       "limit: $limit",
+      "pathPattern: $pathPattern",
       "libroFmUsername: $libroFmUsername",
       "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
     )
@@ -366,15 +370,19 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
 
     lfdLogger("Converting ${book.title} from mp3 to m4b.")
-    ffmpegClient.convertBookToM4b(book, downloadMetaData.tracks, targetDir, audioQuality)
 
-    lfdLogger("Deleting obsolete mp3 files for ${book.title}")
-    deleteMp3Files(targetDir)
+    if (!dryRun) {
+      ffmpegClient.convertBookToM4b(book, downloadMetaData.tracks, targetDir, audioQuality)
+
+      lfdLogger("Deleting obsolete mp3 files for ${book.title}")
+
+      deleteMp3Files(targetDir)
+    }
   }
 
-  private fun targetDir(book: Book): File {
-    val targetDir = File("$mediaDir/${book.authors.first()}/${book.title}")
-    return targetDir
+  private fun targetDir(book: Book)
+  = File("${mediaDir}/${book.createPath(pathPattern)}").also {
+    lfdLogger("Target Directory: $it")
   }
 
   private suspend fun deleteMp3Files(targetDirectory: File) = withContext(Dispatchers.IO) {

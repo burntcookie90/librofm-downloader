@@ -25,7 +25,28 @@ After the initial download of your library, the container will run a API server.
 Bind a host port to `8080` to access the services.
 
 Endpoints:
-- `/update` allows you to manually force a refresh (ie: when you just purchased a book).
+- GET: `/` opens a basic web interface showing the current config and a button to trigger an update
+- POST: `/update` allows you to manually force a refresh (ie: when you just purchased a book).
+
+
+----
+
+### Path Patterns
+The application supports the following path tokens:
+```
+FIRST_AUTHOR - The first author in the list of authors
+ALL_AUTHORS - All authors in the list of authors separated by ','
+SERIES_NAME - The series name, if it exists
+BOOK_TITLE - The book title
+ISBN - The ISBN of the book
+FIRST_NARRATOR - The first narrator in the list of narrators
+ALL_NARRATORS - All narrators in the list of narrators separated by ','
+```
+
+You can set the env var `PATH_PATTERN` to change the default path pattern. The default is:
+`PATH_PATTERN=FIRST_AUTHOR/BOOK_TITLE`
+
+Changing your path pattern down the road will cause books to redownload, as the existence of the known file structure is how we determine a book has already been downloaded.
 
 ### Docker Compose Example
 ```
