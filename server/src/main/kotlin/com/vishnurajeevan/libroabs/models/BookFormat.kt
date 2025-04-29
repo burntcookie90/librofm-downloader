@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs
+package com.vishnurajeevan.libroabs.models
 
 enum class BookFormat {
   MP3,

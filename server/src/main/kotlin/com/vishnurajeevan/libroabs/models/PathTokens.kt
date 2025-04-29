@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs
+package com.vishnurajeevan.libroabs.models
 
 import com.vishnurajeevan.libroabs.libro.Book
 
