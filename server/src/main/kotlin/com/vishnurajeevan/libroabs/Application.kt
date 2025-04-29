@@ -11,12 +11,23 @@ import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.vishnurajeevan.libroabs.libro.*
+import com.vishnurajeevan.libroabs.models.BookFormat
+import com.vishnurajeevan.libroabs.route.Info
+import com.vishnurajeevan.libroabs.models.ServerInfo
+import com.vishnurajeevan.libroabs.models.createPath
+import com.vishnurajeevan.libroabs.route.Update
 import io.github.kevincianfarini.cardiologist.intervalPulse
 import io.ktor.client.HttpClient
 import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.respondHtml
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.resources.Resources
+import io.ktor.server.resources.get
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -29,10 +40,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import kotlinx.html.InputType
 import kotlinx.html.body
 import kotlinx.html.button
 import kotlinx.html.head
 import kotlinx.html.id
+import kotlinx.html.input
 import kotlinx.html.onClick
 import kotlinx.html.p
 import kotlinx.html.script
@@ -205,11 +218,30 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       port = port,
       host = "0.0.0.0",
       module = {
+        install(Resources)
+        install(ContentNegotiation) {
+          json(Json { })
+        }
         routing {
-          post("/update") {
-            call.respondText("Updating!")
+          get<Info> {
+            call.respond(ServerInfo(
+              port = port,
+              syncInterval = syncInterval,
+              parallelCount = parallelCount,
+              dryRun = dryRun,
+              renameChapters = renameChapters,
+              writeTitleTag = writeTitleTag,
+              format = format,
+              logLevel = logLevel,
+              limit = limit,
+              pathPattern = pathPattern
+            ))
+          }
+          get<Update> {
+            val overwrite = it.overwrite ?: false
+            call.respondText("Updating, overwrite: $overwrite!")
             libroClient.fetchLibrary()
-            processLibrary()
+            processLibrary(overwrite)
           }
           get("/") {
             call.respondHtml(HttpStatusCode.OK) {
@@ -221,8 +253,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
                   unsafe {
                     +"""
                                     function callUpdateFunction() {
-                                        fetch('/update', {
-                                            method: 'POST'
+                                        const overwriteChecked = document.getElementById('overwriteCheckbox').checked;
+                                        fetch('/update?overwrite=' + overwriteChecked, {
+                                            method: 'GET'
                                         });
                                     }
                                 """.trimIndent()
@@ -240,6 +273,11 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
                   onClick = "callUpdateFunction()"
                   +"Update Library"
                 }
+                +" "
+                input(type = InputType.checkBox) {
+                  id = "overwriteCheckbox"
+                }
+                +" overwrite?"
               }
             }
           }
@@ -254,7 +292,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     )
   }
 
-  private suspend fun processLibrary() {
+  private suspend fun processLibrary(overwrite: Boolean = false) {
     val localLibrary = getLibrary()
 
     localLibrary.audiobooks
@@ -270,7 +308,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           processingSemaphore.withPermit {
             val targetDir = targetDir(book)
 
-            if (!targetDir.exists()) {
+            if (!targetDir.exists() || overwrite) {
               lfdLogger("Downloading ${book.title}")
               targetDir.mkdirs()
               when (format) {
