@@ -26,7 +26,7 @@ Bind a host port to `8080` to access the services.
 
 Endpoints:
 - GET: `/` opens a basic web interface showing the current config and a button to trigger an update
-- POST: `/update` allows you to manually force a refresh (ie: when you just purchased a book).
+- GET: `/update` allows you to manually force a refresh (ie: when you just purchased a book). pass `?overwrite=true` to force download your library.
 
 
 ----
