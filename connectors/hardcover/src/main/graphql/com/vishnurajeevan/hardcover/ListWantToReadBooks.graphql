@@ -1,0 +1,14 @@
+query MyWantToRead {
+  me {
+    user_books(where: {status_id: {_eq: 1}}) {
+      book {
+        id
+        title
+        default_audio_edition {
+          id
+          isbn_13
+        }
+      }
+    }
+  }
+}

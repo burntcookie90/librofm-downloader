@@ -29,3 +29,5 @@ dependencyResolutionManagement {
 }
 
 include(":server")
+include(":connectors:api")
+include(":connectors:hardcover")
