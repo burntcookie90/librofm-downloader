@@ -29,24 +29,11 @@ class LibroApiHandler(
   private val lfdLogger: (String) -> Unit = {},
   logLevel: ApplicationLogLevel,
 ) {
-  private val ktorfit = Ktorfit.Builder()
+  private val ktorfit: Ktorfit = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
     .httpClient(client.config {
       defaultRequest {
         contentType(ContentType.Application.Json)
-      }
-      install(Logging) {
-        logger = object : Logger {
-          override fun log(message: String) {
-            lfdLogger(message)
-          }
-
-        }
-        level = when(logLevel) {
-          ApplicationLogLevel.NONE -> LogLevel.NONE
-          ApplicationLogLevel.INFO -> LogLevel.INFO
-          ApplicationLogLevel.VERBOSE -> LogLevel.ALL
-        }
       }
       install(ContentNegotiation) {
         json(Json {
@@ -61,19 +48,6 @@ class LibroApiHandler(
   private val downloadClient = client.config {
     install(HttpTimeout) {
       requestTimeoutMillis = 5 * 60 * 1000
-    }
-    install(Logging) {
-      logger = object : Logger {
-        override fun log(message: String) {
-          lfdLogger(message)
-        }
-
-      }
-      level = when(logLevel) {
-        ApplicationLogLevel.NONE -> LogLevel.NONE
-        ApplicationLogLevel.INFO -> LogLevel.INFO
-        ApplicationLogLevel.VERBOSE -> LogLevel.ALL
-      }
     }
   }
 
