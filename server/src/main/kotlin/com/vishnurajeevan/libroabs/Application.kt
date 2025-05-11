@@ -16,6 +16,7 @@ import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.models.ServerInfo
 import com.vishnurajeevan.libroabs.models.createPath
 import com.vishnurajeevan.libroabs.route.Update
+import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import io.github.kevincianfarini.cardiologist.intervalPulse
 import io.ktor.client.HttpClient
 import io.ktor.http.HttpStatusCode
@@ -205,7 +206,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
         else -> error("Unhandled sync interval")
       }
 
-      Clock.System.intervalPulse(syncIntervalTimeUnit)
+      Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat { _, _ ->
           lfdLogger("Checking library on pulse!")
           libroClient.fetchLibrary()
