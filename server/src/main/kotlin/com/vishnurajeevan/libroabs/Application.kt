@@ -10,28 +10,41 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
-import com.vishnurajeevan.libroabs.libro.*
+import com.vishnurajeevan.libroabs.healthchck.HealthcheckApi
+import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
+import com.vishnurajeevan.libroabs.libro.Book
+import com.vishnurajeevan.libroabs.libro.FfmpegClient
+import com.vishnurajeevan.libroabs.libro.LibraryMetadata
+import com.vishnurajeevan.libroabs.libro.LibroApiHandler
+import com.vishnurajeevan.libroabs.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.libro.Tracks
+import com.vishnurajeevan.libroabs.libro.createFilenames
+import com.vishnurajeevan.libroabs.libro.createTrackTitles
 import com.vishnurajeevan.libroabs.models.BookFormat
-import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.models.ServerInfo
 import com.vishnurajeevan.libroabs.models.createPath
+import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.route.Update
+import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
-import io.github.kevincianfarini.cardiologist.intervalPulse
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
+import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.respondHtml
 import io.ktor.server.netty.Netty
+import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.resources.Resources
 import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +72,7 @@ import net.bramp.ffmpeg.FFprobe
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import kotlin.getValue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
@@ -125,6 +139,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val pathPattern by option("--path-pattern", envvar = "PATH_PATTERN")
     .default("FIRST_AUTHOR/BOOK_TITLE")
 
+  private val healthCheckHost by option("--healthcheck-host", envvar = "HEALTHCHECK_HOST")
+    .default("https://hc-ping.com")
+
+  private val healthCheckId by option("--healthcheck-id", envvar = "HEALTHCHECK_ID")
+    .default("")
+
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
 
@@ -138,9 +158,27 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
   }
 
+  private val defaultHttpClient by lazy {
+    HttpClient {
+      install(Logging) {
+        logger = object : Logger {
+          override fun log(message: String) {
+            lfdLogger(message)
+          }
+
+        }
+        level = when (logLevel) {
+          ApplicationLogLevel.NONE -> LogLevel.NONE
+          ApplicationLogLevel.INFO -> LogLevel.INFO
+          ApplicationLogLevel.VERBOSE -> LogLevel.ALL
+        }
+      }
+    }
+  }
+
   private val libroClient by lazy {
     LibroApiHandler(
-      client = HttpClient { },
+      client = defaultHttpClient,
       dataDir = dataDir,
       dryRun = dryRun,
       logLevel = logLevel,
@@ -158,6 +196,19 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     )
   }
 
+  private val healthCheckClient: HealthcheckApi? by lazy {
+    if (healthCheckId.isNotEmpty()) {
+      Ktorfit.Builder()
+        .baseUrl(if (healthCheckHost.endsWith("/")) healthCheckHost else "$healthCheckHost/")
+        .httpClient(defaultHttpClient)
+        .build()
+        .createHealthcheckApi()
+    } else {
+      null
+    }
+  }
+
+
   private val appScope = CoroutineScope(Dispatchers.Default)
   private val processingScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
   private val processingSemaphore by lazy { Semaphore(parallelCount) }
@@ -174,6 +225,8 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       "logLevel: $logLevel",
       "limit: $limit",
       "pathPattern: $pathPattern",
+      "healthCheckHost: $healthCheckHost",
+      "healthCheckId: $healthCheckId",
       "libroFmUsername: $libroFmUsername",
       "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
     )
@@ -193,6 +246,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
 
     appScope.launch {
+      healthCheckClient?.run { ping(healthCheckId) }
       libroClient.fetchLibrary()
       processLibrary()
     }
@@ -209,23 +263,29 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat { _, _ ->
           lfdLogger("Checking library on pulse!")
+          healthCheckClient?.run { ping(healthCheckId) }
           libroClient.fetchLibrary()
           processLibrary()
         }
     }
 
-    embeddedServer(
-      factory = Netty,
-      port = port,
-      host = "0.0.0.0",
-      module = {
-        install(Resources)
-        install(ContentNegotiation) {
-          json(Json { })
-        }
-        routing {
-          get<Info> {
-            call.respond(ServerInfo(
+    setupServer(serverRuntimeInfo).start(wait = true)
+  }
+
+  private fun setupServer(serverRuntimeInfo: List<String>)
+    : EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> = embeddedServer(
+    factory = Netty,
+    port = port,
+    host = "0.0.0.0",
+    module = {
+      install(Resources)
+      install(ContentNegotiation) {
+        json(Json { })
+      }
+      routing {
+        get<Info> {
+          call.respond(
+            ServerInfo(
               port = port,
               syncInterval = syncInterval,
               parallelCount = parallelCount,
@@ -235,57 +295,59 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
               format = format,
               logLevel = logLevel,
               limit = limit,
-              pathPattern = pathPattern
-            ))
-          }
-          get<Update> {
-            val overwrite = it.overwrite ?: false
-            call.respondText("Updating, overwrite: $overwrite!")
-            libroClient.fetchLibrary()
-            processLibrary(overwrite)
-          }
-          get("/") {
-            call.respondHtml(HttpStatusCode.OK) {
-              head {
-                title {
-                  +"libro.fm Downloader"
-                }
-                script {
-                  unsafe {
-                    +"""
-                                    function callUpdateFunction() {
-                                        const overwriteChecked = document.getElementById('overwriteCheckbox').checked;
-                                        fetch('/update?overwrite=' + overwriteChecked, {
-                                            method: 'GET'
-                                        });
-                                    }
-                                """.trimIndent()
-                  }
+              pathPattern = pathPattern,
+              healthCheckHost = healthCheckHost,
+              healthCheckId = healthCheckId,
+            )
+          )
+        }
+        get<Update> {
+          val overwrite = it.overwrite ?: false
+          call.respondText("Updating, overwrite: $overwrite!")
+          libroClient.fetchLibrary()
+          processLibrary(overwrite)
+        }
+        get("/") {
+          call.respondHtml(HttpStatusCode.OK) {
+            head {
+              title {
+                +"libro.fm Downloader"
+              }
+              script {
+                unsafe {
+                  +"""
+                                      function callUpdateFunction() {
+                                          const overwriteChecked = document.getElementById('overwriteCheckbox').checked;
+                                          fetch('/update?overwrite=' + overwriteChecked, {
+                                              method: 'GET'
+                                          });
+                                      }
+                                  """.trimIndent()
                 }
               }
-              body {
-                serverRuntimeInfo.forEach {
-                  p {
-                    +it
-                  }
+            }
+            body {
+              serverRuntimeInfo.forEach {
+                p {
+                  +it
                 }
-                button {
-                  id = "updateButton"
-                  onClick = "callUpdateFunction()"
-                  +"Update Library"
-                }
-                +" "
-                input(type = InputType.checkBox) {
-                  id = "overwriteCheckbox"
-                }
-                +" overwrite?"
               }
+              button {
+                id = "updateButton"
+                onClick = "callUpdateFunction()"
+                +"Update Library"
+              }
+              +" "
+              input(type = InputType.checkBox) {
+                id = "overwriteCheckbox"
+              }
+              +" overwrite?"
             }
           }
         }
       }
-    ).start(wait = true)
-  }
+    }
+  )
 
   private suspend fun getLibrary(): LibraryMetadata = withContext(Dispatchers.IO) {
     return@withContext Json.decodeFromString<LibraryMetadata>(
@@ -419,8 +481,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
   }
 
-  private fun targetDir(book: Book)
-  = File("${mediaDir}/${book.createPath(pathPattern)}").also {
+  private fun targetDir(book: Book) = File("${mediaDir}/${book.createPath(pathPattern)}").also {
     lfdLogger("Target Directory: $it")
   }
 

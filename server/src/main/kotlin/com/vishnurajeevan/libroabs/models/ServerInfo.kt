@@ -16,4 +16,6 @@ data class ServerInfo(
   val logLevel: ApplicationLogLevel,
   val limit: Int,
   val pathPattern: String,
+  val healthCheckHost: String,
+  val healthCheckId: String,
 )

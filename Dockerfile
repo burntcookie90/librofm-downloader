@@ -44,7 +44,9 @@ ENV \
     LIMIT="-1" \
     SYNC_INTERVAL="d" \
     PARALLEL_COUNT=1 \
-    PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE"
+    PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE" \
+    HEALTHCHECK_ID="" \
+    HEALTHCHECK_HOST="https://hc-ping.com"
 
 WORKDIR /app
 COPY scripts/run.sh ./
