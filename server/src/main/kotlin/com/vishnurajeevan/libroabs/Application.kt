@@ -45,6 +45,7 @@ import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.head
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +73,6 @@ import net.bramp.ffmpeg.FFprobe
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
-import kotlin.getValue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
@@ -273,81 +273,91 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private fun setupServer(serverRuntimeInfo: List<String>)
-    : EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> = embeddedServer(
-    factory = Netty,
-    port = port,
-    host = "0.0.0.0",
-    module = {
-      install(Resources)
-      install(ContentNegotiation) {
-        json(Json { })
-      }
-      routing {
-        get<Info> {
-          call.respond(
-            ServerInfo(
-              port = port,
-              syncInterval = syncInterval,
-              parallelCount = parallelCount,
-              dryRun = dryRun,
-              renameChapters = renameChapters,
-              writeTitleTag = writeTitleTag,
-              format = format,
-              logLevel = logLevel,
-              limit = limit,
-              pathPattern = pathPattern,
-              healthCheckHost = healthCheckHost,
-              healthCheckId = healthCheckId,
+    : EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
+    val serverInfo = ServerInfo(
+      port = port,
+      syncInterval = syncInterval,
+      parallelCount = parallelCount,
+      dryRun = dryRun,
+      renameChapters = renameChapters,
+      writeTitleTag = writeTitleTag,
+      format = format,
+      logLevel = logLevel,
+      limit = limit,
+      pathPattern = pathPattern,
+      healthCheckHost = healthCheckHost,
+      healthCheckId = healthCheckId,
+    )
+    return embeddedServer(
+      factory = Netty,
+      port = port,
+      host = "0.0.0.0",
+      module = {
+        install(Resources)
+        install(ContentNegotiation) {
+          json(Json { })
+        }
+        routing {
+          get<Info> {
+            call.respond(
+              serverInfo
             )
-          )
-        }
-        get<Update> {
-          val overwrite = it.overwrite ?: false
-          call.respondText("Updating, overwrite: $overwrite!")
-          libroClient.fetchLibrary()
-          processLibrary(overwrite)
-        }
-        get("/") {
-          call.respondHtml(HttpStatusCode.OK) {
-            head {
-              title {
-                +"libro.fm Downloader"
-              }
-              script {
-                unsafe {
-                  +"""
-                                      function callUpdateFunction() {
-                                          const overwriteChecked = document.getElementById('overwriteCheckbox').checked;
-                                          fetch('/update?overwrite=' + overwriteChecked, {
-                                              method: 'GET'
-                                          });
-                                      }
-                                  """.trimIndent()
+          }
+          get<Update> {
+            val overwrite = it.overwrite ?: false
+            call.respondText("Updating, overwrite: $overwrite!")
+            libroClient.fetchLibrary()
+            processLibrary(overwrite)
+          }
+          head("/") {
+            call.response.headers.append(
+              "App-Hash",
+              "${serverInfo.hashCode()}"
+            )
+            call.respond("")
+          }
+          get("/") {
+            call.respondHtml(HttpStatusCode.OK) {
+              head {
+                title {
+                  +"libro.fm Downloader"
+                }
+                script {
+                  unsafe {
+                    +"""
+                                          function callUpdateFunction() {
+                                              const overwriteChecked = document.getElementById('overwriteCheckbox').checked;
+                                              fetch('/update?overwrite=' + overwriteChecked, {
+                                                  method: 'GET'
+                                              });
+                                          }
+                                      """.trimIndent()
+                  }
                 }
               }
-            }
-            body {
-              serverRuntimeInfo.forEach {
-                p {
-                  +it
+              body {
+                serverRuntimeInfo.forEach {
+                  p {
+                    +it
+                  }
                 }
+                button {
+                  id = "updateButton"
+                  onClick = "callUpdateFunction()"
+                  +"Update Library"
+                }
+                +" "
+                input(type = InputType.checkBox) {
+                  id = "overwriteCheckbox"
+                }
+                +" overwrite?"
               }
-              button {
-                id = "updateButton"
-                onClick = "callUpdateFunction()"
-                +"Update Library"
-              }
-              +" "
-              input(type = InputType.checkBox) {
-                id = "overwriteCheckbox"
-              }
-              +" overwrite?"
             }
           }
         }
       }
+    )
     }
-  )
 
   private suspend fun getLibrary(): LibraryMetadata = withContext(Dispatchers.IO) {
     return@withContext Json.decodeFromString<LibraryMetadata>(
