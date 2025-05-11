@@ -1,11 +1,16 @@
 package com.vishnurajeevan.libroabs.connector.hardcover
 
 import com.apollographql.apollo.ApolloClient
+import com.vishnurajeevan.hardcover.MyIdQuery
+import com.vishnurajeevan.hardcover.MyOwnedQuery
 import com.vishnurajeevan.hardcover.MyWantToReadQuery
 import com.vishnurajeevan.libroabs.connector.ConnectorAudioBook
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.MetadataConnector
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class HardcoverMetadataConnector(
@@ -19,6 +24,14 @@ class HardcoverMetadataConnector(
     .addInterceptor(LoggingInterceptor())
     .dispatcher(dispatcher)
     .build()
+
+  private var myId: Int? = null
+
+  init {
+    CoroutineScope(dispatcher).launch {
+      myId = apolloClient.query(MyIdQuery()).execute().data!!.me.first().id
+    }
+  }
 
   override suspend fun getWantedBooks(): List<ConnectorBook> = withContext(dispatcher) {
     apolloClient.query(MyWantToReadQuery()).execute().data?.me?.flatMap { me ->
