@@ -71,3 +71,6 @@ services:
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
 ```
+
+To be notified when sync is failing visit https://healthchecks.io, create a check, and specify
+the ID to the container using the `HEALTHCHECK_ID` environment variable.
