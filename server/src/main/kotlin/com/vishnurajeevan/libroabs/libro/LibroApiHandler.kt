@@ -148,8 +148,8 @@ class LibroApiHandler(
         .wishlist
         .audiobooks
         .map { it.isbn }
-        .also { lfdLogger("Syncing wishlist for $it") }
     ).forEach {
+      lfdLogger("Syncing wishlist for $it")
       libroAPI.addToWishlist(token, it)
       delay(3.seconds)
     }

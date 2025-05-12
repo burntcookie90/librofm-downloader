@@ -5,19 +5,10 @@ query MyWantToRead {
         id
         title
         editions(where: {reading_format: {format: { _eq:"Listened"}}}) {
-          edition_format
-          edition_information
           reading_format {
             id
             format
           }
-          object_type
-          isbn_13
-        }
-
-        default_audio_edition {
-          id
-          isbn_10
           isbn_13
         }
       }
