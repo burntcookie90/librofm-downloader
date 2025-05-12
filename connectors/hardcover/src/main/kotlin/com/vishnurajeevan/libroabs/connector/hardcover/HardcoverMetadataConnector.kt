@@ -2,15 +2,13 @@ package com.vishnurajeevan.libroabs.connector.hardcover
 
 import com.apollographql.apollo.ApolloClient
 import com.vishnurajeevan.hardcover.MyIdQuery
-import com.vishnurajeevan.hardcover.MyOwnedQuery
 import com.vishnurajeevan.hardcover.MyWantToReadQuery
-import com.vishnurajeevan.libroabs.connector.ConnectorAudioBook
+import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.MetadataConnector
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class HardcoverMetadataConnector(
@@ -40,10 +38,10 @@ class HardcoverMetadataConnector(
           ConnectorBook(
             id = it.id.toString(),
             name = it.title!!,
-            connectorAudioBook = it.default_audio_edition?.let {
-              ConnectorAudioBook(
-                id = it.id.toString(),
-                isbn13 = it.isbn_13
+            connectorAudioBook = it.editions.map { edition ->
+              ConnectorAudioBookEdition(
+                id = edition.reading_format!!.id.toString(),
+                isbn13 = edition.isbn_13
               )
             }
           )

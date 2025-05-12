@@ -214,15 +214,16 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private val metaDataConnector: MetadataConnector? by lazy {
     when {
-        hardcoverToken.isNotEmpty() -> {
-          HardcoverMetadataConnector(
-            token = hardcoverToken,
-            dispatcher = Dispatchers.IO
-          )
-        }
-        else -> {
-          null
-        }
+      hardcoverToken.isNotEmpty() -> {
+        HardcoverMetadataConnector(
+          token = hardcoverToken,
+          dispatcher = Dispatchers.IO
+        )
+      }
+
+      else -> {
+        null
+      }
     }
   }
 
@@ -283,17 +284,23 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           healthCheckClient?.run { ping(healthCheckId) }
           libroClient.fetchLibrary()
           processLibrary()
+          metaDataConnector?.syncWishlistFromConnector()
         }
     }
 
     appScope.launch {
-      libroClient.syncWishlist(metaDataConnector?.getWantedBooks()?.map {
-        it.connectorAudioBook?.isbn13
-      }?.filterNotNull() ?: emptyList()
-      )
+      metaDataConnector?.syncWishlistFromConnector()
     }
 
     setupServer(serverRuntimeInfo).start(wait = true)
+  }
+
+  private suspend fun MetadataConnector.syncWishlistFromConnector() {
+    libroClient.syncWishlist(
+        getWantedBooks()
+        .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
+        .filterNotNull()
+    )
   }
 
   private fun setupServer(serverRuntimeInfo: List<String>)
@@ -381,7 +388,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
         }
       }
     )
-    }
+  }
 
   private suspend fun getLibrary(): LibraryMetadata = withContext(Dispatchers.IO) {
     return@withContext Json.decodeFromString<LibraryMetadata>(

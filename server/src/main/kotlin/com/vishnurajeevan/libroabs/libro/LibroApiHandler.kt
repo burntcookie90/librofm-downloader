@@ -141,22 +141,18 @@ class LibroApiHandler(
     }
   }
 
-  suspend fun syncWishlist(isbns: List<String>) = withContext(Dispatchers.IO){
+  suspend fun syncWishlist(isbns: List<String>) = withContext(Dispatchers.IO) {
     isbns.minus(
       libroAPI.fetchWishlist(token)
         .data
         .wishlist
         .audiobooks
-        .map {
-          it.isbn
-        }
-        .also {
-          lfdLogger("Syncing wishlist for $it")
-        })
-      .forEach {
-        libroAPI.addToWishlist(token, it)
-        delay(3.seconds)
-      }
+        .map { it.isbn }
+        .also { lfdLogger("Syncing wishlist for $it") }
+    ).forEach {
+      libroAPI.addToWishlist(token, it)
+      delay(3.seconds)
+    }
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) {
