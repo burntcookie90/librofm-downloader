@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew dependencies --no-daemon -
 
 # Copy source code after dependencies are cached
 COPY server ./server
+COPY connectors ./connectors
 
 # Build the project efficiently
 RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:installDist --no-daemon
@@ -46,7 +47,8 @@ ENV \
     PARALLEL_COUNT=1 \
     PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE" \
     HEALTHCHECK_ID="" \
-    HEALTHCHECK_HOST="https://hc-ping.com"
+    HEALTHCHECK_HOST="https://hc-ping.com" \
+    HARDCOVER_TOKEN=""
 
 WORKDIR /app
 COPY scripts/run.sh ./

@@ -34,4 +34,14 @@ interface LibroAPI {
     @Path("isbn") isbn: String,
   ): Response<M4bMetadata>
 
+  @GET("api/v10/explore/wishlist")
+  suspend fun fetchWishlist(
+    @Header("Authorization") authToken: String,
+  ): WishlistResponse
+
+  @POST("api/v10/explore/wishlist/{isbn}")
+  suspend fun addToWishlist(
+    @Header("Authorization") authToken: String,
+    @Path("isbn") isbn: String
+  ): Response<Unit>
 }

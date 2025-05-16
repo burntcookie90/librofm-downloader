@@ -1,4 +1,5 @@
 [versions]
+apollo = "4.2.0"
 cardiologist = "0.4.0"
 clikt = "5.0.3"
 ffmpeg = "0.8.0"
@@ -13,6 +14,7 @@ ktorfit = "2.5.1"
 logback = "1.5.18"
 
 [libraries]
+apollo-runtime = { module = "com.apollographql.apollo:apollo-runtime", version.ref = "apollo" }
 cardiologist = { module = "io.github.kevincianfarini.cardiologist:cardiologist", version.ref = "cardiologist" }
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 ffmpeg = { module = "net.bramp.ffmpeg:ffmpeg", version.ref = "ffmpeg" }
@@ -38,6 +40,7 @@ ktorfit-lib = { module = "de.jensklingenberg.ktorfit:ktorfit-lib", version.ref =
 ktorfit-response= { module = "de.jensklingenberg.ktorfit:ktorfit-converters-response", version.ref = "ktorfit" }
 
 [plugins]
+apollo = { id = "com.apollographql.apollo", version.ref = "apollo" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }

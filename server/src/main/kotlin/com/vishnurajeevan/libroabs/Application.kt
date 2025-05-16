@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
+import com.vishnurajeevan.libroabs.connector.MetadataConnector
+import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverMetadataConnector
 import com.vishnurajeevan.libroabs.healthchck.HealthcheckApi
 import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
 import com.vishnurajeevan.libroabs.libro.Book
@@ -145,6 +147,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val healthCheckId by option("--healthcheck-id", envvar = "HEALTHCHECK_ID")
     .default("")
 
+  private val hardcoverToken by option("--hardcover", envvar = "HARDCOVER_TOKEN")
+    .default("")
+
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
 
@@ -181,7 +186,6 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       client = defaultHttpClient,
       dataDir = dataDir,
       dryRun = dryRun,
-      logLevel = logLevel,
       lfdLogger = lfdLogger
     )
   }
@@ -208,6 +212,20 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
   }
 
+  private val metaDataConnector: MetadataConnector? by lazy {
+    when {
+      hardcoverToken.isNotEmpty() -> {
+        HardcoverMetadataConnector(
+          token = hardcoverToken,
+          dispatcher = Dispatchers.IO
+        )
+      }
+
+      else -> {
+        null
+      }
+    }
+  }
 
   private val appScope = CoroutineScope(Dispatchers.Default)
   private val processingScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
@@ -266,10 +284,23 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           healthCheckClient?.run { ping(healthCheckId) }
           libroClient.fetchLibrary()
           processLibrary()
+          metaDataConnector?.syncWishlistFromConnector()
         }
     }
 
+    appScope.launch {
+      metaDataConnector?.syncWishlistFromConnector()
+    }
+
     setupServer(serverRuntimeInfo).start(wait = true)
+  }
+
+  private suspend fun MetadataConnector.syncWishlistFromConnector() {
+    libroClient.syncWishlist(
+        getWantedBooks()
+        .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
+        .filterNotNull()
+    )
   }
 
   private fun setupServer(serverRuntimeInfo: List<String>)
@@ -357,7 +388,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
         }
       }
     )
-    }
+  }
 
   private suspend fun getLibrary(): LibraryMetadata = withContext(Dispatchers.IO) {
     return@withContext Json.decodeFromString<LibraryMetadata>(

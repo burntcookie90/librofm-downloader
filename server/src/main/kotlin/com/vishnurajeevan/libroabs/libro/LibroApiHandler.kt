@@ -1,18 +1,17 @@
 package com.vishnurajeevan.libroabs.libro
 
-import com.vishnurajeevan.libroabs.ApplicationLogLevel
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -21,13 +20,13 @@ import java.util.zip.ZipInputStream
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.outputStream
+import kotlin.time.Duration.Companion.seconds
 
 class LibroApiHandler(
   client: HttpClient,
   private val dataDir: String,
   private val dryRun: Boolean,
   private val lfdLogger: (String) -> Unit = {},
-  logLevel: ApplicationLogLevel,
 ) {
   private val ktorfit: Ktorfit = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
@@ -71,23 +70,24 @@ class LibroApiHandler(
     }
   }
 
+  private val token = "Bearer $authToken"
+
   suspend fun fetchLibrary(page: Int = 1) = withContext(Dispatchers.IO) {
-    val library = libroAPI.fetchLibrary("Bearer $authToken", page)
+    val library = libroAPI.fetchLibrary(token, page)
     if (library.audiobooks.isNotEmpty()) {
       File("$dataDir/library.json").writeText(Json.encodeToString<LibraryMetadata>(library))
     }
   }
 
   suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata {
-    return libroAPI.fetchDownloadMetadata("Bearer $authToken", isbn)
+    return libroAPI.fetchDownloadMetadata(token, isbn)
   }
 
   suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
-    val response = libroAPI.fetchM4BMetadata("Bearer $authToken", isbn)
+    val response = libroAPI.fetchM4BMetadata(token, isbn)
     return if (response.isSuccessful) {
       Result.success(response.body()!!)
-    }
-    else {
+    } else {
       Result.failure(Exception("M4B Not Found!"))
     }
   }
@@ -141,12 +141,28 @@ class LibroApiHandler(
     }
   }
 
+  suspend fun syncWishlist(isbns: List<String>) = withContext(Dispatchers.IO) {
+    isbns.minus(
+      libroAPI.fetchWishlist(token)
+        .data
+        .wishlist
+        .audiobooks
+        .map { it.isbn }
+    ).forEach {
+      lfdLogger("Syncing wishlist for $it")
+      libroAPI.addToWishlist(token, it)
+      delay(3.seconds)
+    }
+  }
+
   private suspend fun downloadFile(url: Url, destinationFile: File) {
-    lfdLogger("""
+    lfdLogger(
+      """
       ----
       Downloading $url to ${destinationFile.name}
       ----
-    """.trimIndent())
+    """.trimIndent()
+    )
     val response = downloadClient.get(url)
 
     val input = response.body<ByteReadChannel>()
