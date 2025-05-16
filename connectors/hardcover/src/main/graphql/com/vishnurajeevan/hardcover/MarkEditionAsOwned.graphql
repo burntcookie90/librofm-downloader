@@ -1,0 +1,5 @@
+mutation MarkEditionAsOwned($id: Int!) {
+  edition_owned(id: $id) {
+    id
+  }
+}

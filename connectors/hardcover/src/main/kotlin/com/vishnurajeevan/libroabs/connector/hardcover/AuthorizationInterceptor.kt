@@ -10,10 +10,11 @@ internal class AuthorizationInterceptor(
 ) : HttpInterceptor {
 
   override suspend fun intercept(request: HttpRequest, chain: HttpInterceptorChain): HttpResponse {
-    val response = chain.proceed(request.newBuilder().addHeader("Authorization", "Bearer $token").build())
+    val newRequest = request.newBuilder().addHeader("Authorization", "Bearer $token").build()
+    val response = chain.proceed(newRequest)
 
     return if (response.statusCode == 401) {
-      chain.proceed(request.newBuilder().addHeader("Authorization", "Bearer $token").build())
+      chain.proceed(newRequest)
     } else {
       response
     }

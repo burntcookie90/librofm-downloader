@@ -10,8 +10,9 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
-import com.vishnurajeevan.libroabs.connector.MetadataConnector
-import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverMetadataConnector
+import com.vishnurajeevan.libroabs.connector.ConnectorBook
+import com.vishnurajeevan.libroabs.connector.TrackerConnector
+import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverTrackerConnector
 import com.vishnurajeevan.libroabs.healthchck.HealthcheckApi
 import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
 import com.vishnurajeevan.libroabs.libro.Book
@@ -212,11 +213,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
   }
 
-  private val metaDataConnector: MetadataConnector? by lazy {
+  private val trackerConnector: TrackerConnector? by lazy {
     when {
       hardcoverToken.isNotEmpty() -> {
-        HardcoverMetadataConnector(
+        HardcoverTrackerConnector(
           token = hardcoverToken,
+          logger = lfdLogger,
           dispatcher = Dispatchers.IO
         )
       }
@@ -284,18 +286,18 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           healthCheckClient?.run { ping(healthCheckId) }
           libroClient.fetchLibrary()
           processLibrary()
-          metaDataConnector?.syncWishlistFromConnector()
+          trackerConnector?.syncWishlistFromConnector()
         }
     }
 
     appScope.launch {
-      metaDataConnector?.syncWishlistFromConnector()
+      trackerConnector?.syncWishlistFromConnector()
     }
 
     setupServer(serverRuntimeInfo).start(wait = true)
   }
 
-  private suspend fun MetadataConnector.syncWishlistFromConnector() {
+  private suspend fun TrackerConnector.syncWishlistFromConnector() {
     libroClient.syncWishlist(
         getWantedBooks()
         .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
@@ -446,6 +448,15 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
             }
           }
         }
+      }
+
+    val isbn13s = localLibrary.audiobooks.map { it.isbn }
+    lfdLogger(isbn13s.map { "\"$it\"" }.toString())
+    val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
+    val ownedBooks: List<ConnectorBook> = trackerConnector?.getOwnedBooks().orEmpty()
+    editions.minus(ownedBooks)
+      .forEach {
+        trackerConnector?.markOwned(it)
       }
   }
 

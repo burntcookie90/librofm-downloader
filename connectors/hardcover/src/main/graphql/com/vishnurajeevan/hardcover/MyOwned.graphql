@@ -4,5 +4,10 @@ query MyOwned($id: Int!) {
     book {
       title
     }
+    edition {
+      id
+      isbn_13
+      title
+    }
   }
 }
