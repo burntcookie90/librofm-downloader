@@ -1,5 +1,7 @@
 package com.vishnurajeevan.libroabs.libro
 
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFmpegUtils
 import net.bramp.ffmpeg.FFprobe
@@ -137,7 +139,7 @@ class FfmpegClient(
       "artist" to author,
       "album" to "${title}${series?.let { " ($it Book ${seriesNum ?: "X"})" } ?: ""}",
       "genre" to genres.joinToString(", "),
-      "date" to publicationDate.substring(0, 4),
+      "date" to publicationDate.toLocalDateTime(TimeZone.UTC).year.toString(),
       "publisher" to publisher,
       "comment" to description.replace("\n", " ")
     )

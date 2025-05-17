@@ -1,6 +1,7 @@
 package com.vishnurajeevan.libroabs.libro
 
 import com.vishnurajeevan.libroabs.models.createPath
+import kotlinx.datetime.Instant
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +18,7 @@ class PathTokenTest {
       track_count = 12
     ),
     publisher = "Test Publisher",
-    publication_date = "2023-01-01",
+    publication_date = Instant.parse("2024-03-19T00:00:00.000Z"),
     description = "A great novel",
     genres = listOf(Genre("Fiction")),
     series = "Amazing Series",
@@ -35,7 +36,7 @@ class PathTokenTest {
       track_count = 24
     ),
     publisher = "Another Publisher",
-    publication_date = "2023-02-01",
+    publication_date = Instant.parse("2021-09-28T00:00:00.000Z"),
     description = "Written by multiple authors",
     genres = listOf(Genre("Non-fiction")),
     series = null,
@@ -53,7 +54,7 @@ class PathTokenTest {
       track_count = 36
     ),
     publisher = "Epic Publisher",
-    publication_date = "2023-03-01",
+    publication_date = Instant.parse("2024-03-19T00:00:00.000Z"),
     description = "Narrated by multiple people",
     genres = listOf(Genre("Fantasy")),
     series = "Epic Series",
@@ -116,6 +117,12 @@ class PathTokenTest {
     assertEquals(expected, File(multipleNarratorsBook.createPath(pathPattern)).path)
   }
 
+  @Test
+  fun testPublicationDateInPath() {
+    val pathPattern = "PUBLICATION_YEAR/PUBLICATION_MONTH/PUBLICATION_DAY/BOOK_TITLE"
+    val expected = "2024/3/19/The Great Novel"
+    assertEquals(expected, File(singleAuthorBook.createPath(pathPattern)).path)
+  }
 
   @Test
   fun testListOfBooksWithFullPathPattern() {
