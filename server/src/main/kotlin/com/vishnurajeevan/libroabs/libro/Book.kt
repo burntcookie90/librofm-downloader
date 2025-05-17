@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.libro
 
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,7 +11,7 @@ data class Book(
   val cover_url: String,
   val audiobook_info: BookInfo,
   val publisher: String,
-  val publication_date: String,
+  val publication_date: Instant,
   val description: String,
   val genres: List<Genre>,
   val series: String? = null,
