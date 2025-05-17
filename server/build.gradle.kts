@@ -23,6 +23,7 @@ dependencies {
   implementation(libs.jaudiotagger)
   implementation(libs.ffmpeg)
   implementation(libs.kotlinx.io)
+  implementation(libs.kotlinx.datetime)
   implementation(libs.ktor.client.core)
   implementation(libs.ktor.client.cio)
   implementation(libs.ktor.client.logging)
