@@ -41,6 +41,9 @@ BOOK_TITLE - The book title
 ISBN - The ISBN of the book
 FIRST_NARRATOR - The first narrator in the list of narrators
 ALL_NARRATORS - All narrators in the list of narrators separated by ','
+PUBLICATION_YEAR - Year book was published
+PUBLICATION_MONTH - Month book was published (numerical)
+PUBLICATION_DAY - Day book was published (numerical)
 ```
 
 You can set the env var `PATH_PATTERN` to change the default path pattern. The default is:
