@@ -139,7 +139,7 @@ class FfmpegClient(
       "artist" to author,
       "album" to "${title}${series?.let { " ($it Book ${seriesNum ?: "X"})" } ?: ""}",
       "genre" to genres.joinToString(", "),
-      "date" to publicationDate.toLocalDateTime(TimeZone.currentSystemDefault()).year.toString(),
+      "date" to publicationDate.toLocalDateTime(TimeZone.UTC).year.toString(),
       "publisher" to publisher,
       "comment" to description.replace("\n", " ")
     )
