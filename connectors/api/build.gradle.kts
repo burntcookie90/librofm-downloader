@@ -3,3 +3,7 @@ plugins {
 }
 
 group = "com.vishnurajeevan.libroabs"
+
+dependencies {
+  api(libs.kotlinx.datetime)
+}

@@ -2,14 +2,17 @@ package com.vishnurajeevan.libroabs
 
 import com.github.ajalt.clikt.command.SuspendingCliktCommand
 import com.github.ajalt.clikt.command.main
+import com.github.ajalt.clikt.parameters.groups.cooccurring
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.options.varargValues
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
+import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverTrackerConnector
@@ -26,6 +29,8 @@ import com.vishnurajeevan.libroabs.libro.createTrackTitles
 import com.vishnurajeevan.libroabs.models.BookFormat
 import com.vishnurajeevan.libroabs.models.ServerInfo
 import com.vishnurajeevan.libroabs.models.createPath
+import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
+import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
 import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.route.Update
 import de.jensklingenberg.ktorfit.Ktorfit
@@ -58,6 +63,8 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.InputType
 import kotlinx.html.body
 import kotlinx.html.button
@@ -130,6 +137,15 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     .int()
     .default(-1)
 
+  private val pathPattern by option("--path-pattern", envvar = "PATH_PATTERN")
+    .default("FIRST_AUTHOR/BOOK_TITLE")
+
+  private val healthChecksIoOptions by HealthchecksIoOptionGroup().cooccurring()
+  private val hardcoverOptions by HardcoverOptionGroup().cooccurring()
+  private val skipTrackingIsbns: List<String> by option("--skip-tracking-isbns", envvar = "SKIP_TRACKING_ISBNS")
+    .varargValues()
+    .default(emptyList())
+
   private val audioQuality: String by option("--audio-quality", envvar = "AUDIO_QUALITY")
     .default("128k")
 
@@ -138,18 +154,6 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private val ffprobePath by option("--ffprobe-path")
     .default("/usr/bin/ffprobe")
-
-  private val pathPattern by option("--path-pattern", envvar = "PATH_PATTERN")
-    .default("FIRST_AUTHOR/BOOK_TITLE")
-
-  private val healthCheckHost by option("--healthcheck-host", envvar = "HEALTHCHECK_HOST")
-    .default("https://hc-ping.com")
-
-  private val healthCheckId by option("--healthcheck-id", envvar = "HEALTHCHECK_ID")
-    .default("")
-
-  private val hardcoverToken by option("--hardcover", envvar = "HARDCOVER_TOKEN")
-    .default("")
 
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
@@ -192,22 +196,25 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private val ffmpegClient by lazy {
-    FfmpegClient(
-      ffprobePath = ffprobePath,
-      executor = FFmpegExecutor(
-        FFmpeg(ffmpegPath),
-        FFprobe(ffprobePath)
+      FfmpegClient(
+        ffprobePath = ffprobePath,
+        executor = FFmpegExecutor(
+          FFmpeg(ffmpegPath),
+          FFprobe(ffprobePath)
+        )
       )
-    )
   }
 
   private val healthCheckClient: HealthcheckApi? by lazy {
-    if (healthCheckId.isNotEmpty()) {
+    if (!healthChecksIoOptions?.healthCheckId.isNullOrEmpty()) {
+      healthChecksIoOptions?.let {
+
       Ktorfit.Builder()
-        .baseUrl(if (healthCheckHost.endsWith("/")) healthCheckHost else "$healthCheckHost/")
+        .baseUrl(if (it.healthCheckHost.endsWith("/")) it.healthCheckHost else "$it.healthCheckHost/")
         .httpClient(defaultHttpClient)
         .build()
         .createHealthcheckApi()
+      }
     } else {
       null
     }
@@ -215,9 +222,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private val trackerConnector: TrackerConnector? by lazy {
     when {
-      hardcoverToken.isNotEmpty() -> {
+      !hardcoverOptions?.hardcoverToken.isNullOrEmpty() -> hardcoverOptions?.let {
         HardcoverTrackerConnector(
-          token = hardcoverToken,
+          token = it.hardcoverToken,
+          endpoint = it.hardcoverEndpoint,
           logger = lfdLogger,
           dispatcher = Dispatchers.IO
         )
@@ -245,8 +253,8 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       "logLevel: $logLevel",
       "limit: $limit",
       "pathPattern: $pathPattern",
-      "healthCheckHost: $healthCheckHost",
-      "healthCheckId: $healthCheckId",
+      "healthCheckHost: ${healthChecksIoOptions?.healthCheckHost}",
+      "healthCheckId: ${healthChecksIoOptions?.healthCheckId}",
       "libroFmUsername: $libroFmUsername",
       "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
     )
@@ -264,9 +272,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       lfdLogger("Token file not found, logging in")
       libroClient.fetchLoginData(libroFmUsername, libroFmPassword)
     }
+    trackerConnector?.login()
 
     appScope.launch {
-      healthCheckClient?.run { ping(healthCheckId) }
+      healthCheckClient?.ping()
       libroClient.fetchLibrary()
       processLibrary()
     }
@@ -283,7 +292,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat { _, _ ->
           lfdLogger("Checking library on pulse!")
-          healthCheckClient?.run { ping(healthCheckId) }
+          healthCheckClient?.ping()
           libroClient.fetchLibrary()
           processLibrary()
           trackerConnector?.syncWishlistFromConnector()
@@ -299,7 +308,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
     libroClient.syncWishlist(
-        getWantedBooks()
+      getWantedBooks()
         .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
         .filterNotNull()
     )
@@ -318,8 +327,8 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       logLevel = logLevel,
       limit = limit,
       pathPattern = pathPattern,
-      healthCheckHost = healthCheckHost,
-      healthCheckId = healthCheckId,
+      healthCheckHost = healthChecksIoOptions?.healthCheckHost.orEmpty(),
+      healthCheckId = healthChecksIoOptions?.healthCheckHost.orEmpty(),
     )
     return embeddedServer(
       factory = Netty,
@@ -451,13 +460,44 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       }
 
     val isbn13s = localLibrary.audiobooks.map { it.isbn }
-    lfdLogger(isbn13s.map { "\"$it\"" }.toString())
     val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
+    val editionsNotFound = isbn13s.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
     val ownedBooks: List<ConnectorBook> = trackerConnector?.getOwnedBooks().orEmpty()
-    editions.minus(ownedBooks)
+
+    val ownedIsbns = ownedBooks.map { books ->
+      books.connectorAudioBook.mapNotNull { it.isbn13 }
+    }.flatten()
+
+    editions
+      .filterNot {
+        it.connectorAudioBook
+          .mapNotNull { it.isbn13 }
+          .any { it in ownedIsbns }
+      }
+      .filterNot { book ->
+        book.connectorAudioBook
+          .mapNotNull { it.isbn13 }
+          .any { it in skipTrackingIsbns }
+      }
       .forEach {
         trackerConnector?.markOwned(it)
       }
+    localLibrary.audiobooks
+      .filter { it.isbn in editionsNotFound }
+      .map { it to trackerConnector?.searchByTitle(it.title, it.authors.first()) }
+      .mapNotNull { (audiobook, trackerBook) ->
+        trackerBook?.let {
+          trackerConnector?.createEdition(it.copy(
+            releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
+            connectorAudioBook = listOf(
+            ConnectorAudioBookEdition(
+              id = "",
+              isbn13 = audiobook.isbn
+            )
+            )))
+        }
+      }
+      .forEach { trackerConnector?.markOwned(it) }
   }
 
   private suspend fun downloadMp3sAndRename(book: Book, targetDir: File) {
@@ -525,7 +565,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     lfdLogger("Converting ${book.title} from mp3 to m4b.")
 
     if (!dryRun) {
-      ffmpegClient.convertBookToM4b(book, downloadMetaData.tracks, targetDir, audioQuality)
+        ffmpegClient.convertBookToM4b(
+          book = book,
+          tracks = downloadMetaData.tracks,
+          targetDirectory = targetDir,
+          audioQuality = audioQuality
+        )
 
       lfdLogger("Deleting obsolete mp3 files for ${book.title}")
 
@@ -570,6 +615,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           audioFile.commit()
         }
       })
+  }
+
+  private suspend fun HealthcheckApi.ping() {
+    healthChecksIoOptions?.let {
+      ping(it.healthCheckId)
+    }
   }
 }
 
