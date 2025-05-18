@@ -1,5 +1,8 @@
-package com.vishnurajeevan.libroabs.libro
+package com.vishnurajeevan.libroabs.ffmpeg
 
+import com.vishnurajeevan.libroabs.libro.models.Tracks
+import com.vishnurajeevan.libroabs.libro.models.Book
+import com.vishnurajeevan.libroabs.libro.models.Chapter
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import net.bramp.ffmpeg.FFmpegExecutor
@@ -16,6 +19,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import kotlin.text.isNotBlank
 
 class FfmpegClient(
   ffprobePath: String,
@@ -139,7 +143,7 @@ class FfmpegClient(
       "artist" to author,
       "album" to "${title}${series?.let { " ($it Book ${seriesNum ?: "X"})" } ?: ""}",
       "genre" to genres.joinToString(", "),
-      "date" to publicationDate.toLocalDateTime(TimeZone.UTC).year.toString(),
+      "date" to publicationDate.toLocalDateTime(TimeZone.Companion.UTC).year.toString(),
       "publisher" to publisher,
       "comment" to description.replace("\n", " ")
     )

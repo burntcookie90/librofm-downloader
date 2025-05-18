@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs.libro
+package com.vishnurajeevan.libroabs.libro.models
 
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable

@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs.libro
+package com.vishnurajeevan.libroabs.ffmpeg
 
 import kotlinx.serialization.Serializable
 
