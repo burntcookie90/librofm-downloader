@@ -210,7 +210,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       healthChecksIoOptions?.let {
 
       Ktorfit.Builder()
-        .baseUrl(if (it.healthCheckHost.endsWith("/")) it.healthCheckHost else "$it.healthCheckHost/")
+        .baseUrl(if (it.healthCheckHost.endsWith("/")) it.healthCheckHost else "${it.healthCheckHost}/")
         .httpClient(defaultHttpClient)
         .build()
         .createHealthcheckApi()
