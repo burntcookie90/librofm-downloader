@@ -7,4 +7,6 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform) apply false
   alias(libs.plugins.kotlinxSerialization) apply false
   alias(libs.plugins.ktorfit) apply false
+  alias(libs.plugins.metro) apply false
+  alias(libs.plugins.redacted) apply false
 }

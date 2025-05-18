@@ -5,14 +5,16 @@ clikt = "5.0.3"
 ffmpeg = "0.8.0"
 jaudiotagger = "3.0.1"
 junit = "4.13.2"
-ksp = "2.1.20-2.0.1"
-kotlin = "2.1.20"
+ksp = "2.1.21-2.0.1"
+kotlin = "2.1.21"
 kotlinxDateTime = "0.6.2"
 kotlinxSerialization = "2.1.20"
 kotlinxIo = "0.7.0"
 ktor = "3.0.0"
 ktorfit = "2.5.1"
+metro = "0.3.2"
 logback = "1.5.18"
+redacted = "1.13.0"
 
 [libraries]
 apollo-runtime = { module = "com.apollographql.apollo:apollo-runtime", version.ref = "apollo" }
@@ -51,3 +53,5 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 ktorfit = { id = "de.jensklingenberg.ktorfit", version.ref = "ktorfit" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinxSerialization" }
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
+redacted = { id = "dev.zacsweers.redacted", version.ref = "redacted" }

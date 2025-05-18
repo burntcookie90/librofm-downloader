@@ -21,9 +21,14 @@ import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
 import com.vishnurajeevan.libroabs.libro.Book
 import com.vishnurajeevan.libroabs.libro.FfmpegClient
 import com.vishnurajeevan.libroabs.libro.LibraryMetadata
+import com.vishnurajeevan.libroabs.libro.LibroAPI
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
+import com.vishnurajeevan.libroabs.libro.LoginRequest
+import com.vishnurajeevan.libroabs.libro.M4bMetadata
 import com.vishnurajeevan.libroabs.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.libro.TokenMetadata
 import com.vishnurajeevan.libroabs.libro.Tracks
+import com.vishnurajeevan.libroabs.libro.WishlistResponse
 import com.vishnurajeevan.libroabs.libro.createFilenames
 import com.vishnurajeevan.libroabs.libro.createTrackTitles
 import com.vishnurajeevan.libroabs.models.BookFormat
@@ -34,6 +39,9 @@ import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
 import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.route.Update
 import de.jensklingenberg.ktorfit.Ktorfit
+import de.jensklingenberg.ktorfit.Response
+import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.logging.LogLevel
@@ -191,7 +199,51 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       client = defaultHttpClient,
       dataDir = dataDir,
       dryRun = dryRun,
-      lfdLogger = lfdLogger
+      logger = lfdLogger,
+      libroAPI = object: LibroAPI {
+        override suspend fun fetchLoginData(loginRequest: LoginRequest): TokenMetadata {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun fetchLibrary(
+          authToken: String,
+          page: Int
+        ): LibraryMetadata {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun fetchAudiobookDetails(
+          authToken: String,
+          isbn: String
+        ): Book {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun fetchDownloadMetadata(
+          authToken: String,
+          isbn: String
+        ): Mp3DownloadMetadata {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun fetchM4BMetadata(
+          authToken: String,
+          isbn: String
+        ): Response<M4bMetadata> {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun fetchWishlist(authToken: String): WishlistResponse {
+          TODO("Not yet implemented")
+        }
+
+        override suspend fun addToWishlist(
+          authToken: String,
+          isbn: String
+        ): Response<Unit> {
+          TODO("Not yet implemented")
+        }
+      }
     )
   }
 
@@ -242,25 +294,32 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val processingSemaphore by lazy { Semaphore(parallelCount) }
 
   override suspend fun run() {
-    val serverRuntimeInfo = listOf(
-      "port: $port",
-      "syncInterval: $syncInterval",
-      "parallelCount: $parallelCount",
-      "dryRun: $dryRun",
-      "renameChapters: $renameChapters",
-      "writeTitleTag: $writeTitleTag",
-      "format: $format",
-      "logLevel: $logLevel",
-      "limit: $limit",
-      "pathPattern: $pathPattern",
-      "healthCheckHost: ${healthChecksIoOptions?.healthCheckHost}",
-      "healthCheckId: ${healthChecksIoOptions?.healthCheckId}",
-      "libroFmUsername: $libroFmUsername",
-      "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
+    val serverInfo = ServerInfo(
+      port = port,
+      dataDir = dataDir,
+      mediaDir = mediaDir,
+      syncInterval = syncInterval,
+      dryRun = dryRun,
+      renameChapters = renameChapters,
+      writeTitleTag = writeTitleTag,
+      format = format,
+      parallelCount = parallelCount,
+      logLevel = logLevel,
+      limit = limit,
+      pathPattern = pathPattern,
+      healthCheckHost = healthChecksIoOptions?.healthCheckHost,
+      healthCheckId = healthChecksIoOptions?.healthCheckId,
+      skipTrackingIsbns = skipTrackingIsbns,
+      audioQuality = audioQuality,
+      ffmpegPath = ffmpegPath,
+      ffprobePath = ffprobePath,
+      libroFmUsername = libroFmUsername,
+      libroFmPassword = libroFmPassword
     )
-    println(
-      serverRuntimeInfo.joinToString("\n")
-    )
+    val graph = createGraphFactory<Graph.Factory>()
+      .create(serverInfo)
+
+    println(serverInfo.formattedString())
 
     val dataDir = File(dataDir).apply {
       if (!exists()) {
@@ -303,7 +362,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       trackerConnector?.syncWishlistFromConnector()
     }
 
-    setupServer(serverRuntimeInfo).start(wait = true)
+    setupServer(serverInfo).start(wait = true)
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
@@ -314,22 +373,8 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     )
   }
 
-  private fun setupServer(serverRuntimeInfo: List<String>)
+  private fun setupServer(serverInfo: ServerInfo)
     : EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
-    val serverInfo = ServerInfo(
-      port = port,
-      syncInterval = syncInterval,
-      parallelCount = parallelCount,
-      dryRun = dryRun,
-      renameChapters = renameChapters,
-      writeTitleTag = writeTitleTag,
-      format = format,
-      logLevel = logLevel,
-      limit = limit,
-      pathPattern = pathPattern,
-      healthCheckHost = healthChecksIoOptions?.healthCheckHost.orEmpty(),
-      healthCheckId = healthChecksIoOptions?.healthCheckHost.orEmpty(),
-    )
     return embeddedServer(
       factory = Netty,
       port = port,
@@ -378,7 +423,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
                 }
               }
               body {
-                serverRuntimeInfo.forEach {
+                serverInfo.formattedString().let {
                   p {
                     +it
                   }

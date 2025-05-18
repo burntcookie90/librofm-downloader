@@ -4,6 +4,8 @@ plugins {
   alias(libs.plugins.kotlinxSerialization)
   alias(libs.plugins.ktor)
   alias(libs.plugins.ktorfit)
+  alias(libs.plugins.metro)
+  alias(libs.plugins.redacted)
   application
 }
 

@@ -1,15 +1,15 @@
 package com.vishnurajeevan.libroabs.libro
 
-import de.jensklingenberg.ktorfit.Ktorfit
-import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.utils.io.*
+import com.vishnurajeevan.libroabs.LfdLogger
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Named
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.get
+import io.ktor.http.Url
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -22,35 +22,20 @@ import kotlin.io.path.div
 import kotlin.io.path.outputStream
 import kotlin.time.Duration.Companion.seconds
 
+@Inject
 class LibroApiHandler(
   client: HttpClient,
-  private val dataDir: String,
-  private val dryRun: Boolean,
-  private val lfdLogger: (String) -> Unit = {},
+  private val libroAPI: LibroAPI,
+  @Named("dataDir") private val dataDir: String,
+  @Named("dryRun") private val dryRun: Boolean,
+  private val logger: LfdLogger,
 ) {
-  private val ktorfit: Ktorfit = Ktorfit.Builder()
-    .baseUrl("https://libro.fm/")
-    .httpClient(client.config {
-      defaultRequest {
-        contentType(ContentType.Application.Json)
-      }
-      install(ContentNegotiation) {
-        json(Json {
-          isLenient = true
-          ignoreUnknownKeys = true
-        })
-      }
-    })
-    .converterFactories(ResponseConverterFactory())
-    .build()
-
   private val downloadClient = client.config {
     install(HttpTimeout) {
       requestTimeoutMillis = 5 * 60 * 1000
     }
   }
 
-  private val libroAPI = ktorfit.createLibroAPI()
   private val authToken by lazy {
     File("$dataDir/token.txt").useLines { it.first() }
   }
@@ -94,7 +79,7 @@ class LibroApiHandler(
 
   suspend fun downloadM4b(m4bUrl: String, targetDirectory: File) {
     if (!dryRun) {
-      lfdLogger("Downloading M4B: $m4bUrl")
+      logger.log("Downloading M4B: $m4bUrl")
       val url = Url(m4bUrl)
       val contentDisposition = url.parameters["response-content-disposition"]!!
 
@@ -110,7 +95,7 @@ class LibroApiHandler(
     data.forEachIndexed { index, part ->
       if (!dryRun) {
         val url = part.url
-        lfdLogger("downloading part ${index + 1}")
+        logger.log("downloading part ${index + 1}")
         val destinationFile = File(targetDirectory, "part-$index.zip")
         downloadFile(Url(url), destinationFile)
 
@@ -149,14 +134,14 @@ class LibroApiHandler(
         .audiobooks
         .map { it.isbn }
     ).forEach {
-      lfdLogger("Syncing wishlist for $it")
+      logger.log("Syncing wishlist for $it")
       libroAPI.addToWishlist(token, it)
       delay(3.seconds)
     }
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) {
-    lfdLogger(
+    logger.log(
       """
       ----
       Downloading $url to ${destinationFile.name}

@@ -14,15 +14,18 @@ import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.ConnectorContributor
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Named
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 
+@Inject
 class HardcoverTrackerConnector(
-    token: String,
-    endpoint: String,
+    @Named("hardcover-token") token: String,
+    @Named("hardcover-endpoint") endpoint: String,
     private val logger: (String) -> Unit = {},
     private val dispatcher: CoroutineDispatcher,
 ) : TrackerConnector {
