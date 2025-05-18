@@ -51,6 +51,17 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
 
 Changing your path pattern down the road will cause books to redownload, as the existence of the known file structure is how we determine a book has already been downloaded.
 
+### Tracker Syncing
+
+#### Hardcover
+
+```mermaid
+flowchart LR
+
+hardcover -- want to read --> libro.fm
+libro.fm -- owned library --> hardcover
+```
+
 ### Docker Compose Example
 ```
 services:
@@ -73,6 +84,9 @@ services:
       # MP3 / M4B_MP3_FALLBACK only
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
+      - HARDCOVER_TOKEN=<>
+      - SKIP_TRACKING_ISBNS=<>
+      - HEALTHCHECK_ID=<>
 ```
 
 To be notified when sync is failing visit https://healthchecks.io, create a check, and specify
