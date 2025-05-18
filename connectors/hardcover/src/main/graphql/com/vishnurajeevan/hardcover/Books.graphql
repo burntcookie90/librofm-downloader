@@ -1,0 +1,16 @@
+query Books($title: String!, $author: String!) {
+  books(
+    where: {title: {_eq: $title}, contributions: {_and: {author: {name: {_eq: $author}}}}}
+    limit: 1
+  ) {
+    id
+    title
+    contributions {
+      id
+      author {
+        id
+        name
+      }
+    }
+  }
+}

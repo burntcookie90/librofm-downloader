@@ -1,0 +1,28 @@
+mutation CreateEdition(
+  $book_id: Int!,
+  $title: String!,
+  $isbn_13: String!,
+  $release_date: date,
+  $contributions: [ContributionInputType!]!) {
+  insert_edition(
+    book_id: $book_id,
+    edition: {
+      book_id: $book_id,
+      locked: false,
+      dto: {
+        title: $title,
+        isbn_13: $isbn_13,
+        edition_format: "Audiobook",
+        reading_format_id: 2,
+        edition_information: "Libro.fm",
+        contributions: $contributions,
+        release_date: $release_date,
+      } }) {
+    id
+    edition {
+      id
+      title
+      isbn_13
+    }
+  }
+}
