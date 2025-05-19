@@ -1,6 +1,6 @@
 package com.vishnurajeevan.libroabs.models
 
-import com.vishnurajeevan.libroabs.libro.Book
+import com.vishnurajeevan.libroabs.libro.models.Book
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime

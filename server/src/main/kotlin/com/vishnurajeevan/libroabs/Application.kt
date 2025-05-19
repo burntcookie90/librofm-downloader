@@ -18,12 +18,12 @@ import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverTrackerConnector
 import com.vishnurajeevan.libroabs.healthchck.HealthcheckApi
 import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
-import com.vishnurajeevan.libroabs.libro.Book
-import com.vishnurajeevan.libroabs.libro.FfmpegClient
-import com.vishnurajeevan.libroabs.libro.LibraryMetadata
+import com.vishnurajeevan.libroabs.libro.models.Book
+import com.vishnurajeevan.libroabs.ffmpeg.FfmpegClient
+import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
-import com.vishnurajeevan.libroabs.libro.Mp3DownloadMetadata
-import com.vishnurajeevan.libroabs.libro.Tracks
+import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.libro.models.Tracks
 import com.vishnurajeevan.libroabs.libro.createFilenames
 import com.vishnurajeevan.libroabs.libro.createTrackTitles
 import com.vishnurajeevan.libroabs.models.BookFormat
@@ -196,13 +196,13 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private val ffmpegClient by lazy {
-      FfmpegClient(
-        ffprobePath = ffprobePath,
-        executor = FFmpegExecutor(
-          FFmpeg(ffmpegPath),
-          FFprobe(ffprobePath)
-        )
+    FfmpegClient(
+      ffprobePath = ffprobePath,
+      executor = FFmpegExecutor(
+        FFmpeg(ffmpegPath),
+        FFprobe(ffprobePath)
       )
+    )
   }
 
   private val healthCheckClient: HealthcheckApi? by lazy {
@@ -292,18 +292,25 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat { _, _ ->
           lfdLogger("Checking library on pulse!")
-          healthCheckClient?.ping()
-          libroClient.fetchLibrary()
-          processLibrary()
-          trackerConnector?.syncWishlistFromConnector()
+          fullUpdate()
         }
     }
 
     appScope.launch {
       trackerConnector?.syncWishlistFromConnector()
+      trackerConnector?.syncWishlistToConnector()
     }
 
     setupServer(serverRuntimeInfo).start(wait = true)
+  }
+
+  private suspend fun fullUpdate(overwrite: Boolean = false) {
+    healthCheckClient?.ping()
+    libroClient.fetchLibrary()
+    processLibrary(overwrite)
+    trackerConnector?.syncWishlistFromConnector()
+    trackerConnector?.syncWishlistToConnector()
+
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
@@ -312,6 +319,41 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
         .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
         .filterNotNull()
     )
+  }
+
+  private suspend fun TrackerConnector.syncWishlistToConnector() {
+    val existingWantedBooks = getWantedBooks().map { it.connectorAudioBook.map { it.isbn13 } }.flatten().filterNotNull()
+    val libroWishlist = libroClient.fetchWishlist()
+    val isbnsToSync = libroWishlist.audiobooks.filter {
+      it.isbn !in existingWantedBooks
+    }.map { it.isbn }
+
+    val editions = getEditions(isbnsToSync)
+    editions.forEach {
+      markWanted(it)
+    }
+
+    val editionsNotFound = isbnsToSync.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
+    libroWishlist.audiobooks
+      .filter { it.isbn in editionsNotFound }
+      .map { libroClient.fetchBookDetails(it.isbn) }
+      .map { it to trackerConnector?.searchByTitle(it.title, it.authors.first()) }
+      .mapNotNull { (audiobook, trackerBook) ->
+        trackerBook?.let {
+          trackerConnector?.createEdition(
+            it.copy(
+              releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
+              connectorAudioBook = listOf(
+                ConnectorAudioBookEdition(
+                  id = "",
+                  isbn13 = audiobook.isbn
+                )
+              )
+            )
+          )
+        }
+      }
+      .forEach { trackerConnector?.markWanted(it) }
   }
 
   private fun setupServer(serverRuntimeInfo: List<String>)
@@ -348,8 +390,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           get<Update> {
             val overwrite = it.overwrite ?: false
             call.respondText("Updating, overwrite: $overwrite!")
-            libroClient.fetchLibrary()
-            processLibrary(overwrite)
+            fullUpdate(overwrite)
           }
           head("/") {
             call.response.headers.append(
@@ -459,6 +500,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
         }
       }
 
+    syncOwned(localLibrary)
+  }
+
+  private suspend fun syncOwned(localLibrary: LibraryMetadata) {
     val isbn13s = localLibrary.audiobooks.map { it.isbn }
     val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
     val editionsNotFound = isbn13s.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
@@ -487,14 +532,17 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       .map { it to trackerConnector?.searchByTitle(it.title, it.authors.first()) }
       .mapNotNull { (audiobook, trackerBook) ->
         trackerBook?.let {
-          trackerConnector?.createEdition(it.copy(
-            releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
-            connectorAudioBook = listOf(
-            ConnectorAudioBookEdition(
-              id = "",
-              isbn13 = audiobook.isbn
+          trackerConnector?.createEdition(
+            it.copy(
+              releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
+              connectorAudioBook = listOf(
+                ConnectorAudioBookEdition(
+                  id = "",
+                  isbn13 = audiobook.isbn
+                )
+              )
             )
-            )))
+          )
         }
       }
       .forEach { trackerConnector?.markOwned(it) }
@@ -565,12 +613,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     lfdLogger("Converting ${book.title} from mp3 to m4b.")
 
     if (!dryRun) {
-        ffmpegClient.convertBookToM4b(
-          book = book,
-          tracks = downloadMetaData.tracks,
-          targetDirectory = targetDir,
-          audioQuality = audioQuality
-        )
+      ffmpegClient.convertBookToM4b(
+        book = book,
+        tracks = downloadMetaData.tracks,
+        targetDirectory = targetDir,
+        audioQuality = audioQuality
+      )
 
       lfdLogger("Deleting obsolete mp3 files for ${book.title}")
 

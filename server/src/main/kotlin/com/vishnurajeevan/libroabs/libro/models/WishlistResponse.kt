@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs.libro
+package com.vishnurajeevan.libroabs.libro.models
 
 import kotlinx.serialization.Serializable
 
@@ -20,6 +20,8 @@ data class WishlistWishlist(
 
 @Serializable
 data class AudioBook(
-  val title: String,
+  val title: String
+  ,
   val isbn: String,
+  val authors: List<String>
 )

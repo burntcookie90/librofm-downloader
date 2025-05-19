@@ -1,15 +1,25 @@
 package com.vishnurajeevan.libroabs.libro
 
+import com.vishnurajeevan.libroabs.ffmpeg.M4bMetadata
+import com.vishnurajeevan.libroabs.libro.models.Book
+import com.vishnurajeevan.libroabs.libro.models.DownloadPart
+import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
+import com.vishnurajeevan.libroabs.libro.models.LoginRequest
+import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.utils.io.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.get
+import io.ktor.http.ContentType
+import io.ktor.http.Url
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -143,16 +153,24 @@ class LibroApiHandler(
 
   suspend fun syncWishlist(isbns: List<String>) = withContext(Dispatchers.IO) {
     isbns.minus(
-      libroAPI.fetchWishlist(token)
-        .data
-        .wishlist
+      fetchWishlist()
         .audiobooks
         .map { it.isbn }
     ).forEach {
       lfdLogger("Syncing wishlist for $it")
-      libroAPI.addToWishlist(token, it)
+      val response = libroAPI.addToWishlist(token, it)
       delay(3.seconds)
     }
+  }
+
+  suspend fun fetchWishlist() = withContext(Dispatchers.IO) {
+    libroAPI.fetchWishlist(token)
+      .data
+      .wishlist
+  }
+
+  suspend fun fetchBookDetails(isbn: String): Book = withContext(Dispatchers.IO) {
+    libroAPI.fetchAudiobookDetails(token, isbn).data.audiobook
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) {
