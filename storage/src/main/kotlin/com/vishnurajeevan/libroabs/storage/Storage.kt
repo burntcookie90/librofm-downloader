@@ -5,7 +5,7 @@ import kotlinx.serialization.KSerializer
 import java.io.File
 
 interface Storage<T: Any> {
-  val data: T
+  suspend fun getData(): T
 
   suspend fun update(update: suspend (T) -> T)
 

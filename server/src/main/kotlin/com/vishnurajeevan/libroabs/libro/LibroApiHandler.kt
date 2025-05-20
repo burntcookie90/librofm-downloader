@@ -170,7 +170,7 @@ class LibroApiHandler(
         .map { it.isbn }
     )
       .minus(
-        wishlistSyncHistoryStorage.data.history.keys
+        wishlistSyncHistoryStorage.getData().history.keys
       )
       .forEach { isbn ->
         lfdLogger("Syncing wishlist for $isbn")

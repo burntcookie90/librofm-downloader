@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -28,12 +29,16 @@ class RealStorage<T : Any>(
     }
   }
 
-  override var data: T
+  private var data: T
     get() = json.decodeFromString(serializer, file.readText())
-    private set(value) = file.writeText(json.encodeToString(serializer, value))
+    set(value) = file.writeText(json.encodeToString(serializer, value))
+
+  override suspend fun getData(): T = withContext(dispatcher) { data }
 
   override suspend fun update(update: suspend (T) -> T) {
-    data = update(data)
+    scope.launch {
+      data = update(getData())
+    }
   }
 
   class Factory<T : Any> : Storage.Factory<T> {
