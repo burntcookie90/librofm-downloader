@@ -1,4 +1,4 @@
-package com.vishnurajeevan.libroabs.libro.models
+package com.vishnurajeevan.libroabs.libro.models.storage
 
 import kotlinx.serialization.Serializable
 

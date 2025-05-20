@@ -16,23 +16,28 @@ import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.connector.hardcover.HardcoverTrackerConnector
+import com.vishnurajeevan.libroabs.ffmpeg.FfmpegClient
 import com.vishnurajeevan.libroabs.healthchck.HealthcheckApi
 import com.vishnurajeevan.libroabs.healthchck.createHealthcheckApi
-import com.vishnurajeevan.libroabs.libro.models.Book
-import com.vishnurajeevan.libroabs.ffmpeg.FfmpegClient
-import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
-import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
-import com.vishnurajeevan.libroabs.libro.models.Tracks
 import com.vishnurajeevan.libroabs.libro.createFilenames
 import com.vishnurajeevan.libroabs.libro.createTrackTitles
+import com.vishnurajeevan.libroabs.libro.models.Book
+import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
+import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.libro.models.Tracks
 import com.vishnurajeevan.libroabs.models.BookFormat
+import com.vishnurajeevan.libroabs.models.Format
+import com.vishnurajeevan.libroabs.models.LibroDownloadHistory
+import com.vishnurajeevan.libroabs.models.LibroDownloadItem
 import com.vishnurajeevan.libroabs.models.ServerInfo
 import com.vishnurajeevan.libroabs.models.createPath
 import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
 import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
 import com.vishnurajeevan.libroabs.route.Info
 import com.vishnurajeevan.libroabs.route.Update
+import com.vishnurajeevan.libroabs.storage.RealStorage
+import com.vishnurajeevan.libroabs.storage.Storage
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import io.ktor.client.HttpClient
@@ -58,6 +63,8 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -77,6 +84,7 @@ import kotlinx.html.script
 import kotlinx.html.title
 import kotlinx.html.unsafe
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import net.bramp.ffmpeg.FFmpeg
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFprobe
@@ -208,12 +216,11 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val healthCheckClient: HealthcheckApi? by lazy {
     if (!healthChecksIoOptions?.healthCheckId.isNullOrEmpty()) {
       healthChecksIoOptions?.let {
-
-      Ktorfit.Builder()
-        .baseUrl(if (it.healthCheckHost.endsWith("/")) it.healthCheckHost else "${it.healthCheckHost}/")
-        .httpClient(defaultHttpClient)
-        .build()
-        .createHealthcheckApi()
+        Ktorfit.Builder()
+          .baseUrl(if (it.healthCheckHost.endsWith("/")) it.healthCheckHost else "${it.healthCheckHost}/")
+          .httpClient(defaultHttpClient)
+          .build()
+          .createHealthcheckApi()
       }
     } else {
       null
@@ -237,6 +244,17 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     }
   }
 
+  private val downloadHistory: Storage<LibroDownloadHistory> by lazy {
+    RealStorage.Factory<LibroDownloadHistory>()
+      .create(
+        file = File("$dataDir/download_history.json"),
+        initial = LibroDownloadHistory(),
+        serializer = serializer(),
+        dispatcher = Dispatchers.IO,
+        logger = lfdLogger
+      )
+  }
+
   private val appScope = CoroutineScope(Dispatchers.Default)
   private val processingScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
   private val processingSemaphore by lazy { Semaphore(parallelCount) }
@@ -258,24 +276,14 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       "libroFmUsername: $libroFmUsername",
       "libroFmPassword: ${libroFmPassword.map { "*" }.joinToString("")}",
     )
-    println(
-      serverRuntimeInfo.joinToString("\n")
-    )
+    println(serverRuntimeInfo.joinToString("\n"))
 
-    val dataDir = File(dataDir).apply {
-      if (!exists()) {
-        mkdirs()
-      }
-    }
-    val tokenFile = File("$dataDir/token.txt")
-    if (!tokenFile.exists()) {
-      lfdLogger("Token file not found, logging in")
-      libroClient.fetchLoginData(libroFmUsername, libroFmPassword)
-    }
+
+    healthCheckClient?.ping()
+    libroClient.fetchLoginData(libroFmUsername, libroFmPassword)
     trackerConnector?.login()
 
     appScope.launch {
-      healthCheckClient?.ping()
       libroClient.fetchLibrary()
       processLibrary()
     }
@@ -444,16 +452,32 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     )
   }
 
-  private suspend fun getLibrary(): LibraryMetadata = withContext(Dispatchers.IO) {
-    return@withContext Json.decodeFromString<LibraryMetadata>(
-      File("$dataDir/library.json").readText()
-    )
-  }
-
   private suspend fun processLibrary(overwrite: Boolean = false) {
-    val localLibrary = getLibrary()
+    val localLibrary = libroClient.getLocalLibrary()
 
-    localLibrary.audiobooks
+    // We need to prefill the download history with the old filesystem based history
+    if (downloadHistory.getData().books.isEmpty() && File(mediaDir).listFiles().isNotEmpty()) {
+      lfdLogger("Migrating to file based history")
+      localLibrary.audiobooks
+        .forEach { book ->
+          val targetDir = targetDir(book = book)
+          if (targetDir.exists() && targetDir.listFiles().isNotEmpty()) {
+            val isMp3 = targetDir.listFiles().map { it.extension }.any { it == "mp3" }
+            downloadHistory.update {
+              val libroDownloadItem = LibroDownloadItem(
+                isbn = book.isbn,
+                format = if (isMp3) Format.MP3 else Format.M4B,
+                path = targetDir.path
+              )
+              it.copy(
+                books = it.books + (book.isbn to libroDownloadItem)
+              )
+            }
+          }
+        }
+    }
+
+    val downloadResult = localLibrary.audiobooks
       .let {
         if (limit == -1) {
           it
@@ -461,46 +485,96 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
           it.take(limit)
         }
       }
-      .forEach { book ->
-        processingScope.launch {
+      .filter {
+        if (!overwrite) {
+          !downloadHistory.getData().books.containsKey(it.isbn)
+        } else {
+          true
+        }
+      }
+      .map { book ->
+        processingScope.async {
           processingSemaphore.withPermit {
-            val targetDir = targetDir(book)
+            val targetDir = targetDir(book).also { it.mkdirs() }
+            lfdLogger("Downloading ${book.title}")
+            when (format) {
+              BookFormat.MP3 -> {
+                downloadMp3sAndRename(book, targetDir)
+                LibroDownloadItem(
+                  isbn = book.isbn,
+                  format = Format.MP3,
+                  path = targetDir.path,
+                )
+              }
 
-            if (!targetDir.exists() || overwrite) {
-              lfdLogger("Downloading ${book.title}")
-              targetDir.mkdirs()
-              when (format) {
-                BookFormat.MP3 -> {
-                  downloadMp3sAndRename(book, targetDir)
-                }
+              BookFormat.M4B_MP3_FALLBACK -> {
+                val result = downloadBookAsM4b(
+                  book = book,
+                  targetDir = targetDir
+                )
 
-                BookFormat.M4B_MP3_FALLBACK -> {
-                  downloadBookAsM4b(
-                    book = book,
-                    targetDir = targetDir
-                  ).onFailure {
+                when {
+                  result.isSuccess -> {
+                    LibroDownloadItem(
+                      isbn = book.isbn,
+                      format = Format.M4B,
+                      path = targetDir.path,
+                    )
+                  }
+
+                  else -> {
                     lfdLogger("M4B download for ${book.title} failed, falling back to MP3")
                     downloadMp3sAndRename(book, targetDir)
-                  }
-                }
-
-                BookFormat.M4B_CONVERT_FALLBACK -> {
-                  downloadBookAsM4b(
-                    book = book,
-                    targetDir = targetDir
-                  ).onFailure {
-                    lfdLogger("M4B download for ${book.title} failed, falling back to conversion")
-                    downloadMp3sAndRename(book, targetDir)
-                    convertBookToM4b(book)
+                    LibroDownloadItem(
+                      isbn = book.isbn,
+                      format = Format.MP3,
+                      path = targetDir.path,
+                    )
                   }
                 }
               }
-            } else {
-              lfdLogger("skipping ${book.title} as it exists on the filesystem!")
+
+              BookFormat.M4B_CONVERT_FALLBACK -> {
+                val result = downloadBookAsM4b(
+                  book = book,
+                  targetDir = targetDir
+                )
+                when {
+                  result.isSuccess -> {
+                    LibroDownloadItem(
+                      isbn = book.isbn,
+                      format = Format.M4B,
+                      path = targetDir.path,
+                    )
+                  }
+
+                  else -> {
+                    lfdLogger("M4B download for ${book.title} failed, falling back to conversion")
+                    downloadMp3sAndRename(book, targetDir)
+                    convertBookToM4b(book)
+                    LibroDownloadItem(
+                      isbn = book.isbn,
+                      format = Format.M4B_CONVERTED,
+                      path = targetDir.path,
+                    )
+                  }
+                }
+              }
             }
           }
         }
       }
+      .awaitAll()
+      .associateBy { it.isbn }
+
+    if (!downloadResult.isEmpty()) {
+      lfdLogger("Writing $downloadResult to history")
+      downloadHistory.update {
+        it.copy(
+          books = it.books + downloadResult
+        )
+      }
+    }
 
     syncOwned(localLibrary)
   }

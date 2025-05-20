@@ -14,7 +14,8 @@ interface Storage<T: Any> {
       file: File,
       initial: T,
       serializer: KSerializer<T>,
-      dispatcher: CoroutineDispatcher
+      dispatcher: CoroutineDispatcher,
+      logger: (String) -> Unit = {},
     ): Storage<T>
   }
 }

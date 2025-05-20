@@ -6,8 +6,9 @@ import com.vishnurajeevan.libroabs.libro.models.DownloadPart
 import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.libro.models.LoginRequest
 import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
-import com.vishnurajeevan.libroabs.libro.models.WishlistItemSyncStatus
-import com.vishnurajeevan.libroabs.libro.models.WishlistSyncHistory
+import com.vishnurajeevan.libroabs.libro.models.storage.AuthToken
+import com.vishnurajeevan.libroabs.libro.models.storage.WishlistItemSyncStatus
+import com.vishnurajeevan.libroabs.libro.models.storage.WishlistSyncHistory
 import com.vishnurajeevan.libroabs.storage.RealStorage
 import com.vishnurajeevan.libroabs.storage.Storage
 import de.jensklingenberg.ktorfit.Ktorfit
@@ -25,16 +26,16 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.outputStream
-import kotlin.time.Duration.Companion.seconds
 
 class LibroApiHandler(
   client: HttpClient,
@@ -65,45 +66,61 @@ class LibroApiHandler(
   }
 
   private val libroAPI = ktorfit.createLibroAPI()
-  private val authToken by lazy {
-    File("$dataDir/token.txt").useLines { it.first() }
-  }
+
+  private val authTokenStorage: Storage<AuthToken> = RealStorage.Factory<AuthToken>()
+    .create(
+      file = File("$dataDir/auth_token.json"),
+      initial = AuthToken(),
+      serializer = serializer(),
+      dispatcher = Dispatchers.IO,
+      logger = lfdLogger
+    )
 
   private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory> = RealStorage.Factory<WishlistSyncHistory>()
     .create(
       file = File("$dataDir/wishlist_sync_history.json"),
       initial = WishlistSyncHistory(emptyMap()),
-      serializer = WishlistSyncHistory.serializer(),
-      dispatcher = Dispatchers.IO
+      serializer = serializer(),
+      dispatcher = Dispatchers.IO,
+      logger = lfdLogger
+    )
+
+  private val libroLibraryStorage: Storage<LibraryMetadata> = RealStorage.Factory<LibraryMetadata>()
+    .create(
+      file = File("$dataDir/libro_library.json"),
+      initial = LibraryMetadata(),
+      serializer = serializer(),
+      dispatcher = Dispatchers.IO,
+      logger = lfdLogger
     )
 
   suspend fun fetchLoginData(username: String, password: String) = withContext(Dispatchers.IO) {
-    val tokenData = libroAPI.fetchLoginData(
-      LoginRequest(username = username, password = password)
-    )
-    if (tokenData.access_token != null) {
-      val file = File("$dataDir/token.txt")
-      file.printWriter().use {
-        it.write(tokenData.access_token!!)
+    if (authTokenStorage.getData().token.isNullOrEmpty()) {
+      val tokenData = libroAPI.fetchLoginData(
+        LoginRequest(username = username, password = password)
+      )
+      if (tokenData.access_token != null) {
+        authTokenStorage.update {
+          it.copy(
+            token = tokenData.access_token
+          )
+        }
+      } else {
+        println("Login failed!")
+        throw IllegalArgumentException("failed login!")
       }
-    } else {
-      println("Login failed!")
-      throw IllegalArgumentException("failed login!")
     }
   }
 
-  private val token = "Bearer $authToken"
+  private val token by lazy { runBlocking { "Bearer ${authTokenStorage.getData().token}" } }
 
   suspend fun fetchLibrary(page: Int = 1) = withContext(Dispatchers.IO) {
-    val library = libroAPI.fetchLibrary(token, page)
-    if (library.audiobooks.isNotEmpty()) {
-      File("$dataDir/library.json").writeText(Json.encodeToString<LibraryMetadata>(library))
-    }
+    libroLibraryStorage.update { libroAPI.fetchLibrary(authToken = token, page = page) }
   }
 
-  suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata {
-    return libroAPI.fetchDownloadMetadata(token, isbn)
-  }
+  suspend fun getLocalLibrary(): LibraryMetadata = withContext(Dispatchers.IO) { libroLibraryStorage.getData() }
+
+  suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata = libroAPI.fetchDownloadMetadata(token, isbn)
 
   suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
     val response = libroAPI.fetchM4BMetadata(token, isbn)
