@@ -6,6 +6,10 @@ import com.vishnurajeevan.libroabs.libro.models.DownloadPart
 import com.vishnurajeevan.libroabs.libro.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.libro.models.LoginRequest
 import com.vishnurajeevan.libroabs.libro.models.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.libro.models.WishlistItemSyncStatus
+import com.vishnurajeevan.libroabs.libro.models.WishlistSyncHistory
+import com.vishnurajeevan.libroabs.storage.RealStorage
+import com.vishnurajeevan.libroabs.storage.Storage
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.HttpClient
@@ -64,6 +68,14 @@ class LibroApiHandler(
   private val authToken by lazy {
     File("$dataDir/token.txt").useLines { it.first() }
   }
+
+  private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory> = RealStorage.Factory<WishlistSyncHistory>()
+    .create(
+      file = File("$dataDir/wishlist_sync_history.json"),
+      initial = WishlistSyncHistory(emptyMap()),
+      serializer = WishlistSyncHistory.serializer(),
+      dispatcher = Dispatchers.IO
+    )
 
   suspend fun fetchLoginData(username: String, password: String) = withContext(Dispatchers.IO) {
     val tokenData = libroAPI.fetchLoginData(
@@ -156,11 +168,18 @@ class LibroApiHandler(
       fetchWishlist()
         .audiobooks
         .map { it.isbn }
-    ).forEach {
-      lfdLogger("Syncing wishlist for $it")
-      val response = libroAPI.addToWishlist(token, it)
-      delay(3.seconds)
-    }
+    )
+      .minus(
+        wishlistSyncHistoryStorage.getData().history.keys
+      )
+      .forEach { isbn ->
+        lfdLogger("Syncing wishlist for $isbn")
+        val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
+        wishlistSyncHistoryStorage.update {
+          val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
+          it.copy(history = it.history + (isbn to status))
+        }
+      }
   }
 
   suspend fun fetchWishlist() = withContext(Dispatchers.IO) {

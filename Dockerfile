@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew dependencies --no-daemon -
 
 # Copy source code after dependencies are cached
 COPY server ./server
+COPY storage ./storage
 COPY connectors ./connectors
 
 # Build the project efficiently
