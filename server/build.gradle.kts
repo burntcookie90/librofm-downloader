@@ -18,6 +18,7 @@ application {
 
 dependencies {
   implementation(project(":connectors:hardcover"))
+  implementation(project(":storage"))
   implementation(libs.cardiologist)
   implementation(libs.clikt)
   implementation(libs.logback)

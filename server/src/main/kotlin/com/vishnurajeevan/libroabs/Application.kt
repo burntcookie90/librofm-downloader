@@ -314,6 +314,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
+    lfdLogger("Syncing Wishlist from Tracker")
     libroClient.syncWishlist(
       getWantedBooks()
         .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
@@ -322,6 +323,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private suspend fun TrackerConnector.syncWishlistToConnector() {
+    lfdLogger("Syncing Wishlist to Tracker")
     val existingWantedBooks = getWantedBooks().map { it.connectorAudioBook.map { it.isbn13 } }.flatten().filterNotNull()
     val libroWishlist = libroClient.fetchWishlist()
     val isbnsToSync = libroWishlist.audiobooks.filter {
@@ -504,6 +506,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   }
 
   private suspend fun syncOwned(localLibrary: LibraryMetadata) {
+    lfdLogger("Syncing Owned to Tracker")
     val isbn13s = localLibrary.audiobooks.map { it.isbn }
     val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
     val editionsNotFound = isbn13s.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
