@@ -11,9 +11,10 @@ kotlinxDateTime = "0.6.2"
 kotlinxSerialization = "2.1.21"
 kotlinxSerializationJson = "1.8.1"
 kotlinxIo = "0.7.0"
-ktor = "3.0.0"
+ktor = "3.1.0"
 ktorfit = "2.5.2"
 logback = "1.5.18"
+metro = "0.3.2"
 
 [libraries]
 apollo-runtime = { module = "com.apollographql.apollo:apollo-runtime", version.ref = "apollo" }
@@ -54,3 +55,4 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 ktorfit = { id = "de.jensklingenberg.ktorfit", version.ref = "ktorfit" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinxSerialization" }
+metro = { id ="dev.zacsweers.metro", version.ref = "metro" }

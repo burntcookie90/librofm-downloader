@@ -28,7 +28,11 @@ dependencyResolutionManagement {
   }
 }
 
-include(":server")
-include(":storage")
-include(":connectors:api")
-include(":connectors:hardcover")
+include(":server:models")
+include(":server:storage")
+include(":server:app")
+include(":server:connectors:tracker:api")
+include(":server:connectors:tracker:hardcover")
+include(":server:connectors:healthcheck:hcio")
+include(":server:connectors:converter:ffmpeg")
+include(":server:server")
