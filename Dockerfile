@@ -16,11 +16,9 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew dependencies --no-daemon -
 
 # Copy source code after dependencies are cached
 COPY server ./server
-COPY storage ./storage
-COPY connectors ./connectors
 
 # Build the project efficiently
-RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:installDist --no-daemon
+RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:app:installDist --no-daemon
 
 # Use a minimal runtime image
 FROM eclipse-temurin:21-jre-alpine AS runtime
@@ -53,7 +51,7 @@ ENV \
 
 WORKDIR /app
 COPY scripts/run.sh ./
-COPY --from=build /app/server/build/install/server ./
+COPY --from=build /app/server/app/build/install/app ./
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/app/run.sh"]
