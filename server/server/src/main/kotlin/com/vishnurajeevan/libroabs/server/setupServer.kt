@@ -43,7 +43,7 @@ fun setupServer(
     module = {
       install(Resources)
       install(ContentNegotiation) {
-        json(Json { })
+        json()
       }
       routing {
         get<Info> {

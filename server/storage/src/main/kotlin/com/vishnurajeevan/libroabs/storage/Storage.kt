@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.storage
 
+import com.vishnurajeevan.libroabs.models.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.KSerializer
 import java.io.File
@@ -15,7 +16,16 @@ interface Storage<T: Any> {
       initial: T,
       serializer: KSerializer<T>,
       dispatcher: CoroutineDispatcher,
-      logger: (String) -> Unit = {},
+      logger: Logger,
     ): Storage<T>
   }
+
+  interface Factory2<T: Any> {
+    fun create(
+      initial: T,
+      file: File,
+      serializer: KSerializer<T>,
+    ): Storage<T>
+  }
+
 }

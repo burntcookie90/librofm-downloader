@@ -3,12 +3,16 @@ package com.vishnurajeevan.libroabs.libro
 import com.vishnurajeevan.libroabs.models.server.M4bMetadata
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.DownloadPart
-import com.vishnurajeevan.libroabs.models.libro.LibraryMetadata
+import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
-import com.vishnurajeevan.libroabs.libro.models.storage.AuthToken
-import com.vishnurajeevan.libroabs.libro.models.storage.WishlistItemSyncStatus
-import com.vishnurajeevan.libroabs.libro.models.storage.WishlistSyncHistory
+import com.vishnurajeevan.libroabs.storage.models.AuthToken
+import com.vishnurajeevan.libroabs.storage.models.WishlistItemSyncStatus
+import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
+import com.vishnurajeevan.libroabs.models.Logger
+import com.vishnurajeevan.libroabs.models.graph.App
+import com.vishnurajeevan.libroabs.models.graph.Named
+import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.RealStorage
 import com.vishnurajeevan.libroabs.storage.Storage
 import de.jensklingenberg.ktorfit.Ktorfit
@@ -25,11 +29,14 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import me.tatarka.inject.annotations.Inject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
@@ -37,62 +44,17 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.outputStream
 
+@Inject
 class LibroApiHandler(
-  client: HttpClient,
-  private val dataDir: String,
-  private val dryRun: Boolean,
-  private val lfdLogger: (String) -> Unit = {},
+  serverInfo: ServerInfo,
+  private val libroAPI: LibroAPI,
+  @Named("download") private val downloadClient: HttpClient,
+  private val authTokenStorage: Storage<AuthToken>,
+  private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory>,
+  private val libroLibraryStorage: Storage<LibraryMetadata>,
+  private val lfdLogger: Logger,
 ) {
-  private val ktorfit: Ktorfit = Ktorfit.Builder()
-    .baseUrl("https://libro.fm/")
-    .httpClient(client.config {
-      defaultRequest {
-        contentType(ContentType.Application.Json)
-      }
-      install(ContentNegotiation) {
-        json(Json {
-          isLenient = true
-          ignoreUnknownKeys = true
-        })
-      }
-    })
-    .converterFactories(ResponseConverterFactory())
-    .build()
-
-  private val downloadClient = client.config {
-    install(HttpTimeout) {
-      requestTimeoutMillis = 5 * 60 * 1000
-    }
-  }
-
-  private val libroAPI = ktorfit.createLibroAPI()
-
-  private val authTokenStorage: Storage<AuthToken> = RealStorage.Factory<AuthToken>()
-    .create(
-      file = File("$dataDir/auth_token.json"),
-      initial = AuthToken(),
-      serializer = serializer(),
-      dispatcher = Dispatchers.IO,
-      logger = lfdLogger
-    )
-
-  private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory> = RealStorage.Factory<WishlistSyncHistory>()
-    .create(
-      file = File("$dataDir/wishlist_sync_history.json"),
-      initial = WishlistSyncHistory(emptyMap()),
-      serializer = serializer(),
-      dispatcher = Dispatchers.IO,
-      logger = lfdLogger
-    )
-
-  private val libroLibraryStorage: Storage<LibraryMetadata> = RealStorage.Factory<LibraryMetadata>()
-    .create(
-      file = File("$dataDir/libro_library.json"),
-      initial = LibraryMetadata(),
-      serializer = serializer(),
-      dispatcher = Dispatchers.IO,
-      logger = lfdLogger
-    )
+  private val dryRun = serverInfo.dryRun
 
   suspend fun fetchLoginData(username: String, password: String) = withContext(Dispatchers.IO) {
     if (authTokenStorage.getData().token.isNullOrEmpty()) {
@@ -133,7 +95,7 @@ class LibroApiHandler(
 
   suspend fun downloadM4b(m4bUrl: String, targetDirectory: File) {
     if (!dryRun) {
-      lfdLogger("Downloading M4B: $m4bUrl")
+      lfdLogger.log("Downloading M4B: $m4bUrl")
       val url = Url(m4bUrl)
       val contentDisposition = url.parameters["response-content-disposition"]!!
 
@@ -149,7 +111,7 @@ class LibroApiHandler(
     data.forEachIndexed { index, part ->
       if (!dryRun) {
         val url = part.url
-        lfdLogger("downloading part ${index + 1}")
+        lfdLogger.log("downloading part ${index + 1}")
         val destinationFile = File(targetDirectory, "part-$index.zip")
         downloadFile(Url(url), destinationFile)
 
@@ -190,7 +152,7 @@ class LibroApiHandler(
         wishlistSyncHistoryStorage.getData().history.keys
       )
       .forEach { isbn ->
-        lfdLogger("Syncing wishlist for $isbn")
+        lfdLogger.log("Syncing wishlist for $isbn")
         val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
         wishlistSyncHistoryStorage.update {
           val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
@@ -210,7 +172,7 @@ class LibroApiHandler(
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) {
-    lfdLogger(
+    lfdLogger.log(
       """
       ----
       Downloading $url to ${destinationFile.name}

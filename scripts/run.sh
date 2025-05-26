@@ -1,2 +1,2 @@
 #!/bin/sh
-bin/server
+bin/app

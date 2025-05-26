@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.storage
 
+import com.vishnurajeevan.libroabs.models.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +22,7 @@ class RealStorage<T : Any>(
   private val file: File,
   private val serializer: KSerializer<T>,
   private val dispatcher: CoroutineDispatcher,
-  private val logger: (String) -> Unit,
+  private val logger: Logger,
 ) : Storage<T> {
   private val scope = CoroutineScope(dispatcher + SupervisorJob())
   private val json = Json { prettyPrint = true }
@@ -37,7 +38,7 @@ class RealStorage<T : Any>(
   init {
     runBlocking {
       if (!file.exists()) {
-        logger("Creating storage for ${file.path}")
+        logger.log("Creating storage for ${file.path}")
         file.createNewFile()
         file.writeText(json.encodeToString(serializer, initial))
       }
@@ -46,12 +47,11 @@ class RealStorage<T : Any>(
     scope.launch {
       writeQueue.filterNotNull().collect {
         mutex.withLock {
-          logger("Writing $it to storage")
+          logger.log("Writing $it to storage")
           data = it
         }
       }
     }
-
   }
 
   override suspend fun getData(): T = withContext(dispatcher) { data }
@@ -59,7 +59,7 @@ class RealStorage<T : Any>(
   override suspend fun update(update: suspend (T) -> T) {
     scope.launch {
       val new = update(data)
-      logger("dispatching $new to storage ${file.path}")
+      logger.log("dispatching $new to storage ${file.path}")
       writeQueue.emit(new)
     }
   }
@@ -70,7 +70,7 @@ class RealStorage<T : Any>(
       initial: T,
       serializer: KSerializer<T>,
       dispatcher: CoroutineDispatcher,
-      logger: (String) -> Unit,
+      logger: Logger,
     ): Storage<T> =
       RealStorage(
         file = file,

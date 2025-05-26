@@ -1,8 +1,9 @@
 package com.vishnurajeevan.libroabs.models.libro
 
+import dev.zacsweers.redacted.annotations.Redacted
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class TokenMetadata(
-  val access_token: String? = null,
+  @Redacted val access_token: String? = null,
 )

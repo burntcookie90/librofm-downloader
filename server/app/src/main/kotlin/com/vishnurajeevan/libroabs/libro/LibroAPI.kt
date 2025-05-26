@@ -2,7 +2,7 @@ package com.vishnurajeevan.libroabs.libro
 
 import com.vishnurajeevan.libroabs.models.server.M4bMetadata
 import com.vishnurajeevan.libroabs.models.libro.BookDetailsResponse
-import com.vishnurajeevan.libroabs.models.libro.LibraryMetadata
+import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
 import com.vishnurajeevan.libroabs.models.libro.TokenMetadata

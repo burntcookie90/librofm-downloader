@@ -4,7 +4,6 @@ plugins {
   alias(libs.plugins.kotlinxSerialization)
   alias(libs.plugins.ktor)
   alias(libs.plugins.ktorfit)
-  alias(libs.plugins.metro)
   application
 }
 
@@ -13,7 +12,7 @@ group = "com.vishnurajeevan.libroabs"
 version = "1.0.0"
 
 application {
-  mainClass.set("com.vishnurajeevan.libroabs.ApplicationKt")
+  mainClass.set("com.vishnurajeevan.libroabs.LibroDownloaderKt")
   applicationDefaultJvmArgs = listOf("-Dio.ktor.development=${extra["io.ktor.development"] ?: "false"}")
 }
 
@@ -43,6 +42,12 @@ dependencies {
   implementation(libs.ktor.server.resources)
   implementation(libs.ktorfit.lib)
   implementation(libs.ktorfit.response)
+
+  ksp(libs.kotlin.inject.compiler)
+  implementation(libs.kotlin.inject.runtime)
+  ksp(libs.kotlin.inject.anvil.compiler)
+  implementation(libs.kotlin.inject.anvil.runtime)
+  implementation(libs.kotlin.inject.anvil.runtime.optional)
 
   testImplementation(libs.kotlin.test.junit)
 }

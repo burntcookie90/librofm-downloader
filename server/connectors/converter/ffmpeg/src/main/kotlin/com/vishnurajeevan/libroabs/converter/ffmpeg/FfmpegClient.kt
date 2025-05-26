@@ -1,10 +1,13 @@
 package com.vishnurajeevan.libroabs.converter.ffmpeg
 
+import com.vishnurajeevan.libroabs.models.Logger
+import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Chapter
 import com.vishnurajeevan.libroabs.models.libro.Tracks
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import me.tatarka.inject.annotations.Inject
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFmpegUtils
 import net.bramp.ffmpeg.FFprobe
@@ -13,18 +16,21 @@ import net.bramp.ffmpeg.probe.FFmpegFormat
 import net.bramp.ffmpeg.probe.FFmpegProbeResult
 import net.bramp.ffmpeg.progress.Progress
 import net.bramp.ffmpeg.progress.ProgressListener
+import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.BufferedWriter
 import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
-import kotlin.text.isNotBlank
 
+@Inject
+@SingleIn(AppScope::class)
 class FfmpegClient(
-  ffprobePath: String,
+  @Named("ffprobePath") ffprobePath: String,
   private val executor: FFmpegExecutor,
-  private val lfdLogger: (String) -> Unit = {},
+  private val lfdLogger: Logger,
 ) {
 
   private val ffprobe = FFprobe(ffprobePath)
@@ -74,7 +80,7 @@ class FfmpegClient(
       val durationNs = book.audiobook_info.duration * TimeUnit.SECONDS.toNanos(1)
       override fun progress(progress: Progress) {
         val percentage = progress.out_time_ns.toDouble() / durationNs.toDouble();
-        lfdLogger(
+        lfdLogger.log(
           String.format(
             "[%.0f%%] status:%s time:%s ms speed:%.2fx",
             percentage * 100,
@@ -90,7 +96,7 @@ class FfmpegClient(
     listFile.delete()
     metadataFile.delete()
 
-    lfdLogger("M4B file created: ${newFile.absolutePath}")
+    lfdLogger.log("M4B file created: ${newFile.absolutePath}")
   }
 
   private fun downloadCoverImage(coverUrl: String, outputFile: File) {
@@ -100,9 +106,9 @@ class FfmpegClient(
       URI(fullUrl).toURL().openStream().use { input ->
         Files.copy(input, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
       }
-      lfdLogger("Cover image saved to ${outputFile.absolutePath}")
+      lfdLogger.log("Cover image saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
-      lfdLogger("Failed to download cover image: ${e.message}")
+      lfdLogger.log("Failed to download cover image: ${e.message}")
     }
   }
 
