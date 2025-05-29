@@ -91,11 +91,13 @@ class HardcoverTrackerConnector(
           ConnectorBook(
             id = it.id.toString(),
             title = it.title!!,
-            connectorAudioBook = it.editions.map { edition ->
-              ConnectorAudioBookEdition(
-                id = edition.reading_format!!.id.toString(),
-                isbn13 = edition.isbn_13
-              )
+            connectorAudioBook = it.editions.mapNotNull { edition ->
+              edition.reading_format?.let {
+                ConnectorAudioBookEdition(
+                  id = it.toString(),
+                  isbn13 = edition.isbn_13
+                )
+              }
             }
           )
         }
