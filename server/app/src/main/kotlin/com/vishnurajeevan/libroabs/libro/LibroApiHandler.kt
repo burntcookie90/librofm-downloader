@@ -1,41 +1,28 @@
 package com.vishnurajeevan.libroabs.libro
 
-import com.vishnurajeevan.libroabs.models.server.M4bMetadata
+import com.vishnurajeevan.libroabs.models.Logger
+import com.vishnurajeevan.libroabs.models.graph.Io
+import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.DownloadPart
-import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.models.server.M4bMetadata
+import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
+import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.storage.models.WishlistItemSyncStatus
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
-import com.vishnurajeevan.libroabs.models.Logger
-import com.vishnurajeevan.libroabs.models.graph.App
-import com.vishnurajeevan.libroabs.models.graph.Named
-import com.vishnurajeevan.libroabs.models.server.ServerInfo
-import com.vishnurajeevan.libroabs.storage.RealStorage
-import com.vishnurajeevan.libroabs.storage.Storage
-import de.jensklingenberg.ktorfit.Ktorfit
-import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
-import io.ktor.http.ContentType
 import io.ktor.http.Url
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import me.tatarka.inject.annotations.Inject
 import java.io.File
 import java.io.FileOutputStream
@@ -53,10 +40,11 @@ class LibroApiHandler(
   private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory>,
   private val libroLibraryStorage: Storage<LibraryMetadata>,
   private val lfdLogger: Logger,
+  @Io private val ioDispatcher: CoroutineDispatcher,
 ) {
   private val dryRun = serverInfo.dryRun
 
-  suspend fun fetchLoginData(username: String, password: String) = withContext(Dispatchers.IO) {
+  suspend fun fetchLoginData(username: String, password: String) = withContext(ioDispatcher) {
     if (authTokenStorage.getData().token.isNullOrEmpty()) {
       val tokenData = libroAPI.fetchLoginData(
         LoginRequest(username = username, password = password)
@@ -76,11 +64,11 @@ class LibroApiHandler(
 
   private val token by lazy { runBlocking { "Bearer ${authTokenStorage.getData().token}" } }
 
-  suspend fun fetchLibrary(page: Int = 1) = withContext(Dispatchers.IO) {
+  suspend fun fetchLibrary(page: Int = 1) = withContext(ioDispatcher) {
     libroLibraryStorage.update { libroAPI.fetchLibrary(authToken = token, page = page) }
   }
 
-  suspend fun getLocalLibrary(): LibraryMetadata = withContext(Dispatchers.IO) { libroLibraryStorage.getData() }
+  suspend fun getLocalLibrary(): LibraryMetadata = withContext(ioDispatcher) { libroLibraryStorage.getData() }
 
   suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata = libroAPI.fetchDownloadMetadata(token, isbn)
 
@@ -142,7 +130,7 @@ class LibroApiHandler(
     }
   }
 
-  suspend fun syncWishlist(isbns: List<String>) = withContext(Dispatchers.IO) {
+  suspend fun syncWishlist(isbns: List<String>) = withContext(ioDispatcher) {
     isbns.minus(
       fetchWishlist()
         .audiobooks
@@ -161,13 +149,13 @@ class LibroApiHandler(
       }
   }
 
-  suspend fun fetchWishlist() = withContext(Dispatchers.IO) {
+  suspend fun fetchWishlist() = withContext(ioDispatcher) {
     libroAPI.fetchWishlist(token)
       .data
       .wishlist
   }
 
-  suspend fun fetchBookDetails(isbn: String): Book = withContext(Dispatchers.IO) {
+  suspend fun fetchBookDetails(isbn: String): Book = withContext(ioDispatcher) {
     libroAPI.fetchAudiobookDetails(token, isbn).data.audiobook
   }
 

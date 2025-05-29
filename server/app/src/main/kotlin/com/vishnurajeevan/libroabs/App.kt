@@ -25,10 +25,12 @@ import com.vishnurajeevan.libroabs.server.setupServer
 import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -46,6 +48,7 @@ import kotlin.collections.isEmpty
 import kotlin.collections.plus
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @Inject
 @SingleIn(AppScope::class)
@@ -58,6 +61,7 @@ class App(
   private val trackerConnector: TrackerConnector?,
   @App private val appScope: CoroutineScope,
   @Io private val processingScope: CoroutineScope,
+  @Io private val ioDispatcher: CoroutineDispatcher,
   private val processingSemaphore: Semaphore,
   private val lfdLogger: Logger,
   private val downloadHistory: Storage<LibroDownloadHistory>,
@@ -68,10 +72,7 @@ class App(
     libroClient.fetchLoginData(serverInfo.libroUserName, serverInfo.libroPassword)
     trackerConnector?.login()
 
-    appScope.launch {
-      libroClient.fetchLibrary()
-      processLibrary()
-    }
+    appScope.launch { fullUpdate(delayForInitial = true) }
 
     appScope.launch {
       lfdLogger.log("Sync Interval: ${serverInfo.syncInterval}")
@@ -89,24 +90,26 @@ class App(
         }
     }
 
-    appScope.launch {
-      trackerConnector?.syncWishlistFromConnector()
-      trackerConnector?.syncWishlistToConnector()
-    }
-
     setupServer(
       onUpdate = { fullUpdate(it) },
       serverInfo = serverInfo
     ).start(wait = true)
   }
 
-  private suspend fun fullUpdate(overwrite: Boolean = false) {
+  private suspend fun fullUpdate(
+    delayForInitial: Boolean = false,
+    overwrite: Boolean = false
+  ) {
+    val delay = if (delayForInitial || overwrite) 1.minutes else 0.minutes
+
     healthCheckClient.pingWithToken()
     libroClient.fetchLibrary()
+    delay(delay)
     processLibrary(overwrite)
+    delay(delay)
     trackerConnector?.syncWishlistFromConnector()
+    delay(delay)
     trackerConnector?.syncWishlistToConnector()
-
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
@@ -453,7 +456,7 @@ class App(
       })
   }
 
-  private suspend fun HealthcheckApi.pingWithToken() {
+  private suspend fun HealthcheckApi.pingWithToken() = withContext(ioDispatcher) {
     hcToken?.let { if (it.isNotEmpty()) ping(it) }
   }
 }
