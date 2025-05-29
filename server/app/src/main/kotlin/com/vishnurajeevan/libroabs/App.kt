@@ -118,13 +118,21 @@ class App(
     )
   }
 
+  private fun List<ConnectorBook>.mapIsbns() = map { it.connectorAudioBook.map { it.isbn13 } }
+    .flatten()
+    .filterNotNull()
+
   private suspend fun TrackerConnector.syncWishlistToConnector() {
     lfdLogger.log("Syncing Wishlist to Tracker")
-    val existingWantedBooks = getWantedBooks().map { it.connectorAudioBook.map { it.isbn13 } }.flatten().filterNotNull()
+    val existingWantedBooks = getWantedBooks().mapIsbns()
+    val ownedBooks = getOwnedBooks().mapIsbns()
+    val readBooks = getReadBooks().mapIsbns()
     val libroWishlist = libroClient.fetchWishlist()
-    val isbnsToSync = libroWishlist.audiobooks.filter {
-      it.isbn !in existingWantedBooks
-    }.map { it.isbn }
+    val isbnsToSync = libroWishlist.audiobooks
+      .map { it.isbn }
+      .filter { it !in existingWantedBooks }
+      .filter { it !in ownedBooks }
+      .filter { it !in readBooks }
 
     val editions = getEditions(isbnsToSync)
     editions.forEach {

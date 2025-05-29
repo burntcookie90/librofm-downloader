@@ -1,0 +1,17 @@
+query MyRead {
+  me {
+    user_books(where: {status_id: {_eq: 3} }) {
+      book {
+        id
+        title
+        editions {
+          reading_format {
+            id
+            format
+          }
+          isbn_13
+        }
+      }
+    }
+  }
+}

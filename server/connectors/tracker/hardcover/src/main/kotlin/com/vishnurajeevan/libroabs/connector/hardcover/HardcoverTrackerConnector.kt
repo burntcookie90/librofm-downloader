@@ -10,6 +10,7 @@ import com.vishnurajeevan.hardcover.GetEditionByIsbnsQuery
 import com.vishnurajeevan.hardcover.MarkEditionAsOwnedMutation
 import com.vishnurajeevan.hardcover.MyIdQuery
 import com.vishnurajeevan.hardcover.MyOwnedQuery
+import com.vishnurajeevan.hardcover.MyReadQuery
 import com.vishnurajeevan.hardcover.MyWantToReadQuery
 import com.vishnurajeevan.hardcover.type.ContributionInputType
 import com.vishnurajeevan.hardcover.type.Date
@@ -66,6 +67,25 @@ class HardcoverTrackerConnector(
 
   override suspend fun getWantedBooks(): List<ConnectorBook> {
     return apolloClient.query(MyWantToReadQuery()).execute().data?.me?.flatMap { me ->
+      me.user_books.map { userBook ->
+        userBook.book.let {
+          ConnectorBook(
+            id = it.id.toString(),
+            title = it.title!!,
+            connectorAudioBook = it.editions.map { edition ->
+              ConnectorAudioBookEdition(
+                id = edition.reading_format!!.id.toString(),
+                isbn13 = edition.isbn_13
+              )
+            }
+          )
+        }
+      }
+    } ?: emptyList()
+  }
+
+  override suspend fun getReadBooks(): List<ConnectorBook> {
+    return apolloClient.query(MyReadQuery()).execute().data?.me?.flatMap { me ->
       me.user_books.map { userBook ->
         userBook.book.let {
           ConnectorBook(
