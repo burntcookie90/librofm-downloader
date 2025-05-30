@@ -21,7 +21,6 @@ import com.vishnurajeevan.libroabs.models.libro.Tracks
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
-import com.vishnurajeevan.libroabs.models.server.createPath
 import com.vishnurajeevan.libroabs.server.setupServer
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
@@ -65,6 +64,7 @@ class App(
   private val lfdLogger: Logger,
   private val downloadHistoryRepo: DownloadHistoryRepo,
   private val dbWriter: DbWriter,
+  private val targetDir: (Book) -> File,
 ) {
 
   suspend fun run() {
@@ -170,26 +170,7 @@ class App(
   private suspend fun processLibrary(overwrite: Boolean = false) {
     val localLibrary = libroClient.getLocalLibrary()
 
-    // We need to prefill the download history with the old filesystem based history
-    if (downloadHistoryRepo.downloadCount() == 0L && File(serverInfo.mediaDir).listFiles().isNotEmpty()) {
-      lfdLogger.log("Migrating to file based history")
-      localLibrary.audiobooks
-        .forEach { book ->
-          val targetDir = targetDir(book = book)
-          if (targetDir.exists() && targetDir.listFiles().isNotEmpty()) {
-            val isMp3 = targetDir.listFiles().map { it.extension }.any { it == "mp3" }
-            dbWriter.write(
-              DownloadItem(
-                isbn = book.isbn,
-                format = if (isMp3) DownloadedFormat.MP3 else DownloadedFormat.M4B,
-                path = targetDir.path
-              )
-            )
-          }
-        }
-    }
-
-    val downloadResult = localLibrary.audiobooks
+    localLibrary.audiobooks
       .let {
         if (serverInfo.limit == -1) {
           it
@@ -413,11 +394,6 @@ class App(
       deleteMp3Files(targetDir)
     }
   }
-
-  private fun targetDir(book: Book) = File("${serverInfo.mediaDir}/${book.createPath(serverInfo.pathPattern)}")
-    .also {
-      lfdLogger.log("Target Directory: $it")
-    }
 
   private suspend fun deleteMp3Files(targetDirectory: File) = withContext(Dispatchers.IO) {
     targetDirectory.listFiles { file -> file.extension == "mp3" }
