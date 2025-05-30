@@ -1,6 +1,8 @@
+import kotlin.Boolean;
+
 CREATE TABLE wishlist_sync_status (
   isbn TEXT PRIMARY KEY NOT NULL,
-  is_sync_successful INTEGER NOT NULL
+  is_sync_successful INTEGER AS Boolean NOT NULL
 );
 
 insertSync:

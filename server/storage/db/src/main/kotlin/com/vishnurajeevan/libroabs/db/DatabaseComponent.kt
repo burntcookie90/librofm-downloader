@@ -3,6 +3,7 @@ package com.vishnurajeevan.libroabs.db
 import app.cash.sqldelight.EnumColumnAdapter
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
@@ -13,7 +14,7 @@ import java.util.Properties
 interface DatabaseComponent {
   @SingleIn(AppScope::class)
   @Provides
-  fun driver(): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:data.db", Properties(), Database.Schema)
+  fun driver(serverInfo: ServerInfo): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:${serverInfo.dataDir}/data.db", Properties(), Database.Schema)
 
   @SingleIn(AppScope::class)
   @Provides
@@ -24,9 +25,9 @@ interface DatabaseComponent {
 
   @SingleIn(AppScope::class)
   @Provides
-  fun downloadHistoryQueries(db: Database) = db.downloadHistoryQueries
+  fun downloadHistoryQueries(db: Database): DownloadHistoryQueries = db.downloadHistoryQueries
 
   @SingleIn(AppScope::class)
   @Provides
-  fun wishlistSyncQueries(db: Database) = db.wishlistSyncStatusQueries
+  fun wishlistSyncQueries(db: Database): WishlistSyncStatusQueries = db.wishlistSyncStatusQueries
 }

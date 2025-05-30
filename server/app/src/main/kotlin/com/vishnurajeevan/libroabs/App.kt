@@ -72,7 +72,10 @@ class App(
     libroClient.fetchLoginData(serverInfo.libroUserName, serverInfo.libroPassword)
     trackerConnector?.login()
 
-    appScope.launch { fullUpdate(delayForInitial = true) }
+    appScope.launch {
+//      fullUpdate(delayForInitial = true)
+      trackerConnector?.syncWishlistFromConnector()
+    }
 
     appScope.launch {
       lfdLogger.log("Sync Interval: ${serverInfo.syncInterval}")

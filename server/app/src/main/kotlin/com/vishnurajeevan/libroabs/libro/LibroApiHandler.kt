@@ -1,5 +1,7 @@
 package com.vishnurajeevan.libroabs.libro
 
+import com.vishnurajeevan.libroabs.db.writer.DbWriter
+import com.vishnurajeevan.libroabs.db.writer.SyncStatus
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
 import com.vishnurajeevan.libroabs.models.graph.Named
@@ -12,7 +14,7 @@ import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
-import com.vishnurajeevan.libroabs.storage.models.WishlistItemSyncStatus
+import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -41,6 +43,7 @@ class LibroApiHandler(
   private val libroLibraryStorage: Storage<LibraryMetadata>,
   private val lfdLogger: Logger,
   @Io private val ioDispatcher: CoroutineDispatcher,
+  private val dbWriter: DbWriter,
 ) {
   private val dryRun = serverInfo.dryRun
 
@@ -142,10 +145,11 @@ class LibroApiHandler(
       .forEach { isbn ->
         lfdLogger.log("Syncing wishlist for $isbn")
         val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
+        val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
         wishlistSyncHistoryStorage.update {
-          val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
           it.copy(history = it.history + (isbn to status))
         }
+        dbWriter.write(SyncStatus(isbn, status))
       }
   }
 

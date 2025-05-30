@@ -13,6 +13,8 @@ sqldelight {
 }
 
 dependencies {
+  implementation(project(":server:models"))
+  implementation(libs.kotlinx.coroutines)
   implementation(libs.sqldelight.driver)
 
   ksp(libs.kotlin.inject.compiler)
