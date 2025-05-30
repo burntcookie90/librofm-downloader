@@ -1,0 +1,17 @@
+CREATE TABLE wishlist_sync_status (
+  isbn TEXT PRIMARY KEY NOT NULL,
+  is_sync_successful INTEGER NOT NULL
+);
+
+insertSync:
+INSERT INTO wishlist_sync_status
+VALUES ?;
+
+selectSyncByIsbn:
+SELECT *
+FROM wishlist_sync_status
+WHERE isbn = ?;
+
+selectAll:
+SELECT *
+FROM wishlist_sync_status;

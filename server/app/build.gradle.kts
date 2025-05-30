@@ -22,7 +22,7 @@ dependencies {
   implementation(project(":server:connectors:tracker:hardcover"))
   implementation(project(":server:connectors:healthcheck:hcio"))
   implementation(project(":server:connectors:converter:ffmpeg"))
-  implementation(project(":server:storage"))
+  implementation(project(":server:storage:json"))
   implementation(libs.cardiologist)
   implementation(libs.clikt)
   implementation(libs.logback)

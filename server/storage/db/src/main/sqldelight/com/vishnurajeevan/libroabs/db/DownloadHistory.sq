@@ -1,0 +1,15 @@
+import com.vishnurajeevan.libroabs.db.BookFormat;
+
+CREATE TABLE download_history(
+  isbn TEXT PRIMARY KEY NOT NULL,
+  path TEXT NOT NULL,
+  format TEXT AS BookFormat NOT NULL
+);
+
+insertDownload:
+INSERT OR REPLACE INTO download_history
+VALUES ?;
+
+selectAll:
+SELECT *
+FROM download_history;
