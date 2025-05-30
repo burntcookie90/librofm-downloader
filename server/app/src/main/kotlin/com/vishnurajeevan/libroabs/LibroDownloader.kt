@@ -118,7 +118,11 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     )
     println(serverInfo.prettyPrint())
 
-    AppComponent::class.create(serverInfo).app.run()
+    val graph = AppComponent::class.create(serverInfo)
+
+    graph.storageMigrator.migrate()
+
+    graph.app.run()
   }
 }
 

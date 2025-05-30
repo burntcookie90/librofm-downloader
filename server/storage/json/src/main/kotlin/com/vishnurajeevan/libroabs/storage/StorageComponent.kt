@@ -2,10 +2,10 @@ package com.vishnurajeevan.libroabs.storage
 
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
-import com.vishnurajeevan.libroabs.models.server.LibroDownloadHistory
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
+import com.vishnurajeevan.libroabs.storage.models.LibroDownloadHistory
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.serializer

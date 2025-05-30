@@ -6,7 +6,7 @@ CREATE TABLE wishlist_sync_status (
 );
 
 insertSync:
-INSERT INTO wishlist_sync_status
+INSERT OR REPLACE INTO wishlist_sync_status
 VALUES ?;
 
 selectSyncByIsbn:
@@ -16,4 +16,8 @@ WHERE isbn = ?;
 
 selectAll:
 SELECT *
+FROM wishlist_sync_status;
+
+getIsbns:
+SELECT isbn
 FROM wishlist_sync_status;

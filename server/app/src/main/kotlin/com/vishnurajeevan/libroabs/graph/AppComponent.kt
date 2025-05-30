@@ -1,6 +1,7 @@
 package com.vishnurajeevan.libroabs.graph
 
 import com.vishnurajeevan.libroabs.App
+import com.vishnurajeevan.libroabs.StorageMigrator
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
@@ -18,6 +19,8 @@ abstract class AppComponent(
   @get:Provides val serverInfo: ServerInfo
 ) {
   abstract val app: App
+
+  abstract val storageMigrator: StorageMigrator
 
   abstract val libroClient: LibroApiHandler
 

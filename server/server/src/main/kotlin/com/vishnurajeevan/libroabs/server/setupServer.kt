@@ -83,9 +83,13 @@ fun setupServer(
               }
             }
             body {
-              p {
-                +serverInfo.prettyPrint()
-              }
+              serverInfo.prettyPrint()
+                .lines()
+                .forEach {
+                  p {
+                    +it
+                  }
+                }
               button {
                 id = "updateButton"
                 onClick = "callUpdateFunction()"

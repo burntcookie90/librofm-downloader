@@ -1,9 +1,11 @@
-import com.vishnurajeevan.libroabs.db.BookFormat;
+import com.vishnurajeevan.libroabs.models.server.DownloadedFormat;
+
+
 
 CREATE TABLE download_history(
   isbn TEXT PRIMARY KEY NOT NULL,
   path TEXT NOT NULL,
-  format TEXT AS BookFormat NOT NULL
+  format TEXT AS DownloadedFormat NOT NULL
 );
 
 insertDownload:
@@ -12,4 +14,15 @@ VALUES ?;
 
 selectAll:
 SELECT *
+FROM download_history;
+
+isDownloaded:
+SELECT EXISTS (
+  SELECT *
+  FROM download_history
+  WHERE isbn =?
+);
+
+downloadCount:
+SELECT count(*)
 FROM download_history;

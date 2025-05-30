@@ -4,6 +4,9 @@ import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.converter.ffmpeg.FfmpegClient
+import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
+import com.vishnurajeevan.libroabs.db.writer.DbWriter
+import com.vishnurajeevan.libroabs.db.writer.DownloadItem
 import com.vishnurajeevan.libroabs.healthcheck.HealthcheckApi
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.libro.createFilenames
@@ -16,14 +19,12 @@ import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
 import com.vishnurajeevan.libroabs.models.libro.Tracks
 import com.vishnurajeevan.libroabs.models.server.BookFormat
-import com.vishnurajeevan.libroabs.models.server.Format
-import com.vishnurajeevan.libroabs.models.server.LibroDownloadHistory
-import com.vishnurajeevan.libroabs.models.server.LibroDownloadItem
+import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.models.server.createPath
 import com.vishnurajeevan.libroabs.server.setupServer
-import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
+import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -44,8 +45,6 @@ import org.jaudiotagger.tag.FieldKey
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
-import kotlin.collections.isEmpty
-import kotlin.collections.plus
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -64,7 +63,8 @@ class App(
   @Io private val ioDispatcher: CoroutineDispatcher,
   private val processingSemaphore: Semaphore,
   private val lfdLogger: Logger,
-  private val downloadHistory: Storage<LibroDownloadHistory>,
+  private val downloadHistoryRepo: DownloadHistoryRepo,
+  private val dbWriter: DbWriter,
 ) {
 
   suspend fun run() {
@@ -73,8 +73,7 @@ class App(
     trackerConnector?.login()
 
     appScope.launch {
-//      fullUpdate(delayForInitial = true)
-      trackerConnector?.syncWishlistFromConnector()
+      fullUpdate(delayForInitial = !serverInfo.dryRun)
     }
 
     appScope.launch {
@@ -172,23 +171,20 @@ class App(
     val localLibrary = libroClient.getLocalLibrary()
 
     // We need to prefill the download history with the old filesystem based history
-    if (downloadHistory.getData().books.isEmpty() && File(serverInfo.mediaDir).listFiles().isNotEmpty()) {
+    if (downloadHistoryRepo.downloadCount() == 0L && File(serverInfo.mediaDir).listFiles().isNotEmpty()) {
       lfdLogger.log("Migrating to file based history")
       localLibrary.audiobooks
         .forEach { book ->
           val targetDir = targetDir(book = book)
           if (targetDir.exists() && targetDir.listFiles().isNotEmpty()) {
             val isMp3 = targetDir.listFiles().map { it.extension }.any { it == "mp3" }
-            downloadHistory.update {
-              val libroDownloadItem = LibroDownloadItem(
+            dbWriter.write(
+              DownloadItem(
                 isbn = book.isbn,
-                format = if (isMp3) Format.MP3 else Format.M4B,
+                format = if (isMp3) DownloadedFormat.MP3 else DownloadedFormat.M4B,
                 path = targetDir.path
               )
-              it.copy(
-                books = it.books + (book.isbn to libroDownloadItem)
-              )
-            }
+            )
           }
         }
     }
@@ -203,7 +199,7 @@ class App(
       }
       .filter {
         if (!overwrite) {
-          !downloadHistory.getData().books.containsKey(it.isbn)
+          !downloadHistoryRepo.isDownloaded(it.isbn)
         } else {
           true
         }
@@ -218,7 +214,7 @@ class App(
                 downloadMp3sAndRename(book, targetDir)
                 LibroDownloadItem(
                   isbn = book.isbn,
-                  format = Format.MP3,
+                  format = DownloadedFormat.MP3,
                   path = targetDir.path,
                 )
               }
@@ -233,7 +229,7 @@ class App(
                   result.isSuccess -> {
                     LibroDownloadItem(
                       isbn = book.isbn,
-                      format = Format.M4B,
+                      format = DownloadedFormat.M4B,
                       path = targetDir.path,
                     )
                   }
@@ -243,7 +239,7 @@ class App(
                     downloadMp3sAndRename(book, targetDir)
                     LibroDownloadItem(
                       isbn = book.isbn,
-                      format = Format.MP3,
+                      format = DownloadedFormat.MP3,
                       path = targetDir.path,
                     )
                   }
@@ -259,7 +255,7 @@ class App(
                   result.isSuccess -> {
                     LibroDownloadItem(
                       isbn = book.isbn,
-                      format = Format.M4B,
+                      format = DownloadedFormat.M4B,
                       path = targetDir.path,
                     )
                   }
@@ -270,7 +266,7 @@ class App(
                     convertBookToM4b(book)
                     LibroDownloadItem(
                       isbn = book.isbn,
-                      format = Format.M4B_CONVERTED,
+                      format = DownloadedFormat.M4B_CONVERTED,
                       path = targetDir.path,
                     )
                   }
@@ -281,16 +277,15 @@ class App(
         }
       }
       .awaitAll()
-      .associateBy { it.isbn }
-
-    if (!downloadResult.isEmpty()) {
-      lfdLogger.log("Writing $downloadResult to history")
-      downloadHistory.update {
-        it.copy(
-          books = it.books + downloadResult
+      .forEach {
+        dbWriter.write(
+          DownloadItem(
+            isbn = it.isbn,
+            format = it.format,
+            path = it.path
+          )
         )
       }
-    }
 
     syncOwned(localLibrary)
   }
@@ -460,6 +455,6 @@ class App(
   }
 
   private suspend fun HealthcheckApi.pingWithToken() = withContext(ioDispatcher) {
-    hcToken?.let { if (it.isNotEmpty()) ping(it) }
+    hcToken?.let { if (it.isNotEmpty() && !serverInfo.dryRun) ping(it) }
   }
 }
