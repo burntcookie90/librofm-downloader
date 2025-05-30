@@ -1,5 +1,8 @@
 package com.vishnurajeevan.libroabs.libro
 
+import com.vishnurajeevan.libroabs.db.repo.WishlistSyncStatusRepo
+import com.vishnurajeevan.libroabs.db.writer.DbWriter
+import com.vishnurajeevan.libroabs.db.writer.WishlistSyncStatus
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
 import com.vishnurajeevan.libroabs.models.graph.Named
@@ -12,8 +15,7 @@ import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
-import com.vishnurajeevan.libroabs.storage.models.WishlistItemSyncStatus
-import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
+import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -37,10 +39,11 @@ class LibroApiHandler(
   private val libroAPI: LibroAPI,
   @Named("download") private val downloadClient: HttpClient,
   private val authTokenStorage: Storage<AuthToken>,
-  private val wishlistSyncHistoryStorage: Storage<WishlistSyncHistory>,
+  private val wishlistSyncStatusRepo: WishlistSyncStatusRepo,
   private val libroLibraryStorage: Storage<LibraryMetadata>,
   private val lfdLogger: Logger,
   @Io private val ioDispatcher: CoroutineDispatcher,
+  private val dbWriter: DbWriter,
 ) {
   private val dryRun = serverInfo.dryRun
 
@@ -137,15 +140,13 @@ class LibroApiHandler(
         .map { it.isbn }
     )
       .minus(
-        wishlistSyncHistoryStorage.getData().history.keys
+        wishlistSyncStatusRepo.getSyncedIsbns()
       )
       .forEach { isbn ->
         lfdLogger.log("Syncing wishlist for $isbn")
         val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
-        wishlistSyncHistoryStorage.update {
-          val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
-          it.copy(history = it.history + (isbn to status))
-        }
+        val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
+        dbWriter.write(WishlistSyncStatus(isbn, status))
       }
   }
 

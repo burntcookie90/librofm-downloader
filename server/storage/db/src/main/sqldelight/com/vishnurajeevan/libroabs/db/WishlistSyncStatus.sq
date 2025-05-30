@@ -1,0 +1,23 @@
+import kotlin.Boolean;
+
+CREATE TABLE wishlist_sync_status (
+  isbn TEXT PRIMARY KEY NOT NULL,
+  is_sync_successful INTEGER AS Boolean NOT NULL
+);
+
+insertSync:
+INSERT OR REPLACE INTO wishlist_sync_status
+VALUES ?;
+
+selectSyncByIsbn:
+SELECT *
+FROM wishlist_sync_status
+WHERE isbn = ?;
+
+selectAll:
+SELECT *
+FROM wishlist_sync_status;
+
+getIsbns:
+SELECT isbn
+FROM wishlist_sync_status;

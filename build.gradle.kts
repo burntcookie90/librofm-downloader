@@ -8,4 +8,5 @@ plugins {
   alias(libs.plugins.kotlinxSerialization) apply false
   alias(libs.plugins.ktorfit) apply false
   alias(libs.plugins.redacted) apply false
+  alias(libs.plugins.sqldelight) apply false
 }
