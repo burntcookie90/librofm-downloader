@@ -1,7 +1,5 @@
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat;
 
-
-
 CREATE TABLE download_history(
   isbn TEXT PRIMARY KEY NOT NULL,
   path TEXT NOT NULL,

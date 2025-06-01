@@ -4,12 +4,12 @@ import com.vishnurajeevan.libroabs.db.WishlistSyncStatusQueries
 import com.vishnurajeevan.libroabs.db.Wishlist_sync_status
 import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 
-data class WishlistSyncStatus(
+data class LibroFmWishlistSyncStatus(
   val isbn: String,
   val status: WishlistItemSyncStatus
 ): DbWrite
 
-fun WishlistSyncStatus.handle(wishlistSyncStatusQueries: WishlistSyncStatusQueries) {
+fun LibroFmWishlistSyncStatus.handle(wishlistSyncStatusQueries: WishlistSyncStatusQueries) {
   wishlistSyncStatusQueries.insertSync(
     wishlist_sync_status = Wishlist_sync_status(
       isbn,

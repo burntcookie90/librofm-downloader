@@ -1,7 +1,7 @@
 package com.vishnurajeevan.libroabs.db.repo
 
+import com.vishnurajeevan.libroabs.db.TrackerWishlistSyncStatusQueries
 import com.vishnurajeevan.libroabs.db.WishlistSyncStatusQueries
-import com.vishnurajeevan.libroabs.db.writer.WishlistSyncStatus
 import com.vishnurajeevan.libroabs.models.graph.Io
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -10,19 +10,19 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
-interface WishlistSyncStatusRepo {
+interface TrackerWishlistSyncStatusRepo {
   suspend fun getSyncedIsbns(): List<String>
 }
 
 @Inject
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
-class RealWishlistSyncStatusRepo(
-  private val wishlistSyncStatusQueries: WishlistSyncStatusQueries,
+class RealTrackerWishlistSyncStatusRepo(
+  private val queries: TrackerWishlistSyncStatusQueries,
   @Io private val ioDispatcher: CoroutineDispatcher,
-): WishlistSyncStatusRepo {
+) : TrackerWishlistSyncStatusRepo {
 
   override suspend fun getSyncedIsbns(): List<String> = withContext(ioDispatcher) {
-    wishlistSyncStatusQueries.getIsbns().executeAsList()
+    queries.getIsbns().executeAsList()
   }
 }

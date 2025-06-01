@@ -1,8 +1,9 @@
 package com.vishnurajeevan.libroabs.libro
 
-import com.vishnurajeevan.libroabs.db.repo.WishlistSyncStatusRepo
+import com.vishnurajeevan.libroabs.db.repo.LibroFmWishlistSyncStatusRepo
+import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
-import com.vishnurajeevan.libroabs.db.writer.WishlistSyncStatus
+import com.vishnurajeevan.libroabs.db.writer.LibroFmWishlistSyncStatus
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
 import com.vishnurajeevan.libroabs.models.graph.Named
@@ -39,7 +40,7 @@ class LibroApiHandler(
   private val libroAPI: LibroAPI,
   @Named("download") private val downloadClient: HttpClient,
   private val authTokenStorage: Storage<AuthToken>,
-  private val wishlistSyncStatusRepo: WishlistSyncStatusRepo,
+  private val wishlistSyncStatusRepo: LibroFmWishlistSyncStatusRepo,
   private val libroLibraryStorage: Storage<LibraryMetadata>,
   private val lfdLogger: Logger,
   @Io private val ioDispatcher: CoroutineDispatcher,
@@ -146,7 +147,7 @@ class LibroApiHandler(
         lfdLogger.log("Syncing wishlist for $isbn")
         val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
         val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
-        dbWriter.write(WishlistSyncStatus(isbn, status))
+        dbWriter.write(LibroFmWishlistSyncStatus(isbn, status))
       }
   }
 
