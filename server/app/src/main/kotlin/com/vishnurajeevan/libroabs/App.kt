@@ -5,8 +5,10 @@ import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.converter.ffmpeg.FfmpegClient
 import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
+import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.DownloadItem
+import com.vishnurajeevan.libroabs.db.writer.TrackerWishlistSyncStatus
 import com.vishnurajeevan.libroabs.healthcheck.HealthcheckApi
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.libro.createFilenames
@@ -18,6 +20,7 @@ import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
 import com.vishnurajeevan.libroabs.models.libro.Tracks
+import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
@@ -65,6 +68,7 @@ class App(
   private val downloadHistoryRepo: DownloadHistoryRepo,
   private val dbWriter: DbWriter,
   private val targetDir: (Book) -> File,
+  private val trackerWishlistSyncStatusRepo: TrackerWishlistSyncStatusRepo,
 ) {
 
   suspend fun run() {
@@ -132,12 +136,14 @@ class App(
     val existingWantedBooks = getWantedBooks().mapIsbns()
     val ownedBooks = getOwnedBooks().mapIsbns()
     val readBooks = getReadBooks().mapIsbns()
+    val previouslySynced = trackerWishlistSyncStatusRepo.getSyncedIsbns()
     val libroWishlist = libroClient.fetchWishlist()
     val isbnsToSync = libroWishlist.audiobooks
       .map { it.isbn }
       .filter { it !in existingWantedBooks }
       .filter { it !in ownedBooks }
       .filter { it !in readBooks }
+      .filter { it !in previouslySynced }
 
     val editions = getEditions(isbnsToSync)
     editions.forEach {
@@ -164,7 +170,15 @@ class App(
           )
         }
       }
-      .forEach { trackerConnector?.markWanted(it) }
+      .forEach {
+        trackerConnector?.markWanted(it)
+        it.connectorAudioBook.firstOrNull()?.isbn13?.let { isbn ->
+          dbWriter.write(TrackerWishlistSyncStatus(
+            isbn = isbn,
+            status = WishlistItemSyncStatus.SUCCESS
+          ))
+        }
+      }
   }
 
   private suspend fun processLibrary(overwrite: Boolean = false) {

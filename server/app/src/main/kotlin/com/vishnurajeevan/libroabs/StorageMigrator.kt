@@ -1,10 +1,10 @@
 package com.vishnurajeevan.libroabs
 
 import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
-import com.vishnurajeevan.libroabs.db.repo.WishlistSyncStatusRepo
+import com.vishnurajeevan.libroabs.db.repo.LibroFmWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.DownloadItem
-import com.vishnurajeevan.libroabs.db.writer.WishlistSyncStatus
+import com.vishnurajeevan.libroabs.db.writer.LibroFmWishlistSyncStatus
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
 import com.vishnurajeevan.libroabs.models.libro.Book
@@ -28,7 +28,7 @@ class StorageMigrator(
   private val wishlistHistoryStorage: Storage<WishlistSyncHistory>,
   private val localLibrary: Storage<LibraryMetadata>,
   private val downloadHistoryRepo: DownloadHistoryRepo,
-  private val wishlistSyncStatusRepo: WishlistSyncStatusRepo,
+  private val wishlistSyncStatusRepo: LibroFmWishlistSyncStatusRepo,
   private val dbWriter: DbWriter,
   private val serverInfo: ServerInfo,
   private val lfdLogger: Logger,
@@ -73,7 +73,7 @@ class StorageMigrator(
         .history
         .forEach {
           dbWriter.write(
-            WishlistSyncStatus(
+            LibroFmWishlistSyncStatus(
               isbn = it.key,
               status = it.value
             )
