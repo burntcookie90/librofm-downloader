@@ -8,6 +8,8 @@ sqldelight {
   databases {
     create("Database") {
       packageName.set("com.vishnurajeevan.libroabs.db")
+      verifyMigrations.set(true)
+      schemaOutputDirectory.set(File("src/main/sqldelight/schema"))
     }
   }
 }

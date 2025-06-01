@@ -8,7 +8,7 @@ import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-import java.util.Properties
+import java.util.*
 
 @ContributesTo(AppScope::class)
 interface DatabaseComponent {
@@ -30,4 +30,8 @@ interface DatabaseComponent {
   @SingleIn(AppScope::class)
   @Provides
   fun wishlistSyncQueries(db: Database): WishlistSyncStatusQueries = db.wishlistSyncStatusQueries
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun trackerWishlistQueries(db: Database): TrackerWishlistSyncStatusQueries = db.trackerWishlistSyncStatusQueries
 }
