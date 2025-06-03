@@ -72,7 +72,6 @@ class App(
 ) {
 
   suspend fun run() {
-    healthCheckClient.pingWithToken()
     libroClient.fetchLoginData(serverInfo.libroUserName, serverInfo.libroPassword)
     trackerConnector?.login()
 
@@ -108,7 +107,7 @@ class App(
   ) {
     val delay = if (delayForInitial || overwrite) 1.minutes else 0.minutes
 
-    healthCheckClient.pingWithToken()
+    healthCheckClient.startMeasureWithToken()
     libroClient.fetchLibrary()
     delay(delay)
     processLibrary(overwrite)
@@ -116,6 +115,7 @@ class App(
     trackerConnector?.syncWishlistFromConnector()
     delay(delay)
     trackerConnector?.syncWishlistToConnector()
+    healthCheckClient.pingWithToken()
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
@@ -445,6 +445,10 @@ class App(
   }
 
   private suspend fun HealthcheckApi.pingWithToken() = withContext(ioDispatcher) {
-    hcToken?.let { if (it.isNotEmpty() && !serverInfo.dryRun) ping(it) }
+    hcToken?.let { if (it.isNotEmpty()) ping(it) }
+  }
+
+  private suspend fun HealthcheckApi.startMeasureWithToken() = withContext(ioDispatcher) {
+    hcToken?.let { if (it.isNotEmpty()) start(it) }
   }
 }
