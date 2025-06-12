@@ -137,18 +137,23 @@ class App(
     val ownedBooks = getOwnedBooks().mapIsbns()
     val readBooks = getReadBooks().mapIsbns()
     val previouslySynced = trackerWishlistSyncStatusRepo.getSyncedIsbns()
+    val isbnsToSkip = existingWantedBooks + ownedBooks + readBooks + previouslySynced
     val libroWishlist = libroClient.fetchWishlist()
     val isbnsToSync = libroWishlist.audiobooks
       .map { it.isbn }
-      .filter { it !in existingWantedBooks }
-      .filter { it !in ownedBooks }
-      .filter { it !in readBooks }
-      .filter { it !in previouslySynced }
+      .filter { it !in isbnsToSkip }
 
     val editions = getEditions(isbnsToSync)
-    editions.forEach {
-      markWanted(it)
-    }
+    editions
+      .filter { edition ->
+        edition.connectorAudioBook
+          .none {
+            it.isbn13 in isbnsToSkip
+          }
+      }
+      .forEach {
+        markWanted(it)
+      }
 
     val editionsNotFound = isbnsToSync.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
     libroWishlist.audiobooks
@@ -173,10 +178,12 @@ class App(
       .forEach {
         trackerConnector?.markWanted(it)
         it.connectorAudioBook.firstOrNull()?.isbn13?.let { isbn ->
-          dbWriter.write(TrackerWishlistSyncStatus(
-            isbn = isbn,
-            status = WishlistItemSyncStatus.SUCCESS
-          ))
+          dbWriter.write(
+            TrackerWishlistSyncStatus(
+              isbn = isbn,
+              status = WishlistItemSyncStatus.SUCCESS
+            )
+          )
         }
       }
   }
