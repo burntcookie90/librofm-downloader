@@ -27,6 +27,7 @@ data class ServerInfo(
   val ffprobePath: String,
   val audioQuality: String,
   val skipTrackingIsbns: List<String>,
+  val hardcoverSyncMode: TrackerSyncMode,
 ) {
   fun prettyPrint(): String {
     return """
@@ -45,6 +46,7 @@ data class ServerInfo(
       |  Health Check Host: $healthCheckHost
       |  Health Check ID: $healthCheckId
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
+      |  Tracker sync mode: $hardcoverSyncMode
     """.trimMargin()
   }
 }

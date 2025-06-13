@@ -16,6 +16,7 @@ import com.vishnurajeevan.libroabs.graph.AppComponent
 import com.vishnurajeevan.libroabs.graph.create
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.BookFormat
+import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
 import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
@@ -115,6 +116,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       ffprobePath = ffprobePath,
       audioQuality = audioQuality,
       skipTrackingIsbns = skipTrackingIsbns,
+      hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL
     )
     println(serverInfo.prettyPrint())
 
