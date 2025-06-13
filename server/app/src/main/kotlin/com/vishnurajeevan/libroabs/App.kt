@@ -23,9 +23,9 @@ import com.vishnurajeevan.libroabs.models.libro.Tracks
 import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
+import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.server.setupServer
-import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import kotlinx.coroutines.CoroutineDispatcher
@@ -106,15 +106,33 @@ class App(
     overwrite: Boolean = false
   ) {
     val delay = if (delayForInitial || overwrite) 1.minutes else 0.minutes
-
     healthCheckClient.startMeasureWithToken()
     libroClient.fetchLibrary()
     delay(delay)
     processLibrary(overwrite)
     delay(delay)
-    trackerConnector?.syncWishlistFromConnector()
-    delay(delay)
-    trackerConnector?.syncWishlistToConnector()
+    when (serverInfo.hardcoverSyncMode) {
+      TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER -> {
+        trackerConnector?.syncWishlistToConnector()
+      }
+      TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER -> {
+        syncOwned()
+      }
+      TrackerSyncMode.LIBRO_ALL_TO_HARDCOVER -> {
+        trackerConnector?.syncWishlistToConnector()
+        syncOwned()
+      }
+      TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO -> {
+        trackerConnector?.syncWishlistFromConnector()
+      }
+      TrackerSyncMode.ALL -> {
+        trackerConnector?.syncWishlistToConnector()
+        delay(delay)
+        syncOwned()
+        delay(delay)
+        trackerConnector?.syncWishlistFromConnector()
+      }
+    }
     healthCheckClient.pingWithToken()
   }
 
@@ -281,11 +299,10 @@ class App(
           )
         )
       }
-
-    syncOwned(localLibrary)
   }
 
-  private suspend fun syncOwned(localLibrary: LibraryMetadata) {
+  private suspend fun syncOwned() {
+    val localLibrary = libroClient.getLocalLibrary()
     lfdLogger.log("Syncing Owned to Tracker")
     val isbn13s = localLibrary.audiobooks.map { it.isbn }
     val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
