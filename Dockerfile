@@ -47,7 +47,8 @@ ENV \
     PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE" \
     HEALTHCHECK_ID="" \
     HEALTHCHECK_HOST="https://hc-ping.com" \
-    HARDCOVER_TOKEN=""
+    HARDCOVER_TOKEN="" \
+    HARDCOVER_SYNC_MODE="ALL"
 
 WORKDIR /app
 COPY scripts/run.sh ./
