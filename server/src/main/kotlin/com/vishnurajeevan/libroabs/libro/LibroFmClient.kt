@@ -7,7 +7,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -71,10 +70,22 @@ class LibroApiHandler(
     }
   }
 
-  suspend fun fetchLibrary(page: Int = 1) = withContext(Dispatchers.IO) {
-    val library = libroAPI.fetchLibrary("Bearer $authToken", page)
-    if (library.audiobooks.isNotEmpty()) {
-      File("$dataDir/library.json").writeText(Json.encodeToString<LibraryMetadata>(library))
+  suspend fun fetchLibrary() = withContext(Dispatchers.IO) {
+    val firstResponse = libroAPI.fetchLibrary("Bearer $authToken", 1)
+    if (firstResponse.audiobooks.isNotEmpty()) {
+      var libraryMetadataToSave = firstResponse
+
+      if (firstResponse.total_pages > 1) {
+        (2..firstResponse.total_pages)
+          .forEach { i ->
+            val nextResponse = libroAPI.fetchLibrary("Bearer $authToken", i)
+            libraryMetadataToSave = libraryMetadataToSave.copy(
+              audiobooks = libraryMetadataToSave.audiobooks + nextResponse.audiobooks
+            )
+          }
+      }
+      File("$dataDir/library.json")
+        .writeText(Json.encodeToString<LibraryMetadata>(libraryMetadataToSave))
     }
   }
 
