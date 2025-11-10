@@ -69,7 +69,24 @@ class LibroApiHandler(
   private val token by lazy { runBlocking { "Bearer ${authTokenStorage.getData().token}" } }
 
   suspend fun fetchLibrary(page: Int = 1) = withContext(ioDispatcher) {
-    libroLibraryStorage.update { libroAPI.fetchLibrary(authToken = token, page = page) }
+    libroLibraryStorage.update {
+      val firstPage = libroAPI.fetchLibrary(authToken = token, page = page)
+
+      if (firstPage.total_pages > 1) {
+        var allPages = firstPage
+        (2..firstPage.total_pages)
+          .forEach { i ->
+            val nextPage= libroAPI.fetchLibrary(token, i)
+            allPages = allPages.copy(
+              audiobooks = allPages.audiobooks + nextPage.audiobooks
+            )
+          }
+        allPages
+      }
+      else {
+        firstPage
+      }
+    }
   }
 
   suspend fun getLocalLibrary(): LibraryMetadata = withContext(ioDispatcher) { libroLibraryStorage.getData() }
