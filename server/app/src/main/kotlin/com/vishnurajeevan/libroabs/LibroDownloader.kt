@@ -51,6 +51,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     .enum<BookFormat>(ignoreCase = true)
     .default(BookFormat.MP3)
 
+  private val downloadExtras: Boolean by option("--download-extras", envvar = "DOWNLOAD_EXTRAS")
+    .flag(default = true)
+
   private val parallelCount by option("--parallel-count", envvar = "PARALLEL_COUNT")
     .int()
     .restrictTo(
@@ -105,6 +108,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       renameChapters = renameChapters,
       writeTitleTag = writeTitleTag,
       format = format,
+      downloadExtras = downloadExtras,
       logLevel = logLevel,
       limit = limit,
       pathPattern = pathPattern,

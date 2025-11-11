@@ -11,6 +11,7 @@ import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.DownloadPart
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.models.libro.PdfExtra
 import com.vishnurajeevan.libroabs.models.server.M4bMetadata
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.Storage
@@ -147,6 +148,27 @@ class LibroApiHandler(
           }
         }
         destinationFile.delete()
+      }
+    }
+  }
+
+  suspend fun downloadPdfExtras(
+    isbn: String,
+    data: List<PdfExtra>,
+    targetDirectory: File
+  ) {
+    data.forEach { pdfExtra ->
+      lfdLogger.log("Download PDF Extras for $isbn")
+      val downloadUrl = libroAPI.fetchPdfExtraUrl(
+        authToken = token,
+        isbn = isbn,
+        filename = pdfExtra.filename
+      )
+      if (!dryRun) {
+        downloadFile(
+          url = Url(downloadUrl.pdf_url),
+          destinationFile = File(targetDirectory, pdfExtra.filename)
+        )
       }
     }
   }

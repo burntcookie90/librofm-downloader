@@ -111,26 +111,32 @@ class App(
     delay(delay)
     processLibrary(overwrite)
     delay(delay)
-    when (serverInfo.hardcoverSyncMode) {
-      TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER -> {
-        trackerConnector?.syncWishlistToConnector()
-      }
-      TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER -> {
-        syncOwned()
-      }
-      TrackerSyncMode.LIBRO_ALL_TO_HARDCOVER -> {
-        trackerConnector?.syncWishlistToConnector()
-        syncOwned()
-      }
-      TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO -> {
-        trackerConnector?.syncWishlistFromConnector()
-      }
-      TrackerSyncMode.ALL -> {
-        trackerConnector?.syncWishlistToConnector()
-        delay(delay)
-        syncOwned()
-        delay(delay)
-        trackerConnector?.syncWishlistFromConnector()
+    if (trackerConnector != null) {
+      when (serverInfo.hardcoverSyncMode) {
+        TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER -> {
+          trackerConnector.syncWishlistToConnector()
+        }
+
+        TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER -> {
+          syncOwned()
+        }
+
+        TrackerSyncMode.LIBRO_ALL_TO_HARDCOVER -> {
+          trackerConnector.syncWishlistToConnector()
+          syncOwned()
+        }
+
+        TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO -> {
+          trackerConnector.syncWishlistFromConnector()
+        }
+
+        TrackerSyncMode.ALL -> {
+          trackerConnector.syncWishlistToConnector()
+          delay(delay)
+          syncOwned()
+          delay(delay)
+          trackerConnector.syncWishlistFromConnector()
+        }
       }
     }
     healthCheckClient.pingWithToken()
@@ -229,7 +235,7 @@ class App(
           processingSemaphore.withPermit {
             val targetDir = targetDir(book).also { it.mkdirs() }
             lfdLogger.log("Downloading ${book.title}")
-            when (serverInfo.format) {
+            val result = when (serverInfo.format) {
               BookFormat.MP3 -> {
                 downloadMp3sAndRename(book, targetDir)
                 LibroDownloadItem(
@@ -293,6 +299,12 @@ class App(
                 }
               }
             }
+            libroClient.downloadPdfExtras(
+              isbn = book.isbn,
+              data = book.audiobook_info.pdf_extras,
+              targetDirectory = targetDir
+            )
+            result
           }
         }
       }
