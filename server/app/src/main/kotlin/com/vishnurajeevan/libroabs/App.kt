@@ -299,11 +299,13 @@ class App(
                 }
               }
             }
-            libroClient.downloadPdfExtras(
-              isbn = book.isbn,
-              data = book.audiobook_info.pdf_extras,
-              targetDirectory = targetDir
-            )
+            if (serverInfo.downloadExtras) {
+              libroClient.downloadPdfExtras(
+                isbn = book.isbn,
+                data = book.audiobook_info.pdf_extras,
+                targetDirectory = targetDir
+              )
+            }
             result
           }
         }
