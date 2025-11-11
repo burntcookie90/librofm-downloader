@@ -16,6 +16,6 @@ class HardcoverOptionGroup : OptionGroup() {
 
   val hardcoverSyncMode by option("--hardcover-sync-mode", envvar = "HARDCOVER_SYNC_MODE")
     .enum<TrackerSyncMode>(ignoreCase = true)
-    .default(TrackerSyncMode.ALL)
+    .default(TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER)
 }
 

@@ -28,10 +28,10 @@ dependencyResolutionManagement {
   }
 }
 
+include(":server:app")
 include(":server:models")
 include(":server:storage:db")
 include(":server:storage:json")
-include(":server:app")
 include(":server:connectors:tracker:api")
 include(":server:connectors:tracker:hardcover")
 include(":server:connectors:healthcheck:hcio")
