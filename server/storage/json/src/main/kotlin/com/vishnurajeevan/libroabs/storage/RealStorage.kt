@@ -25,7 +25,10 @@ class RealStorage<T : Any>(
   private val logger: Logger,
 ) : Storage<T> {
   private val scope = CoroutineScope(dispatcher + SupervisorJob())
-  private val json = Json { prettyPrint = true }
+  private val json = Json {
+    prettyPrint = true
+    ignoreUnknownKeys = true
+  }
 
   private val writeQueue: MutableStateFlow<T?> = MutableStateFlow(null)
   private var data: T
