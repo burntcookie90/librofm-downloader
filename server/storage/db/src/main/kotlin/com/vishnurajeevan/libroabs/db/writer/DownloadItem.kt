@@ -15,7 +15,7 @@ fun DownloadItem.handle(downloadHistoryQueries: DownloadHistoryQueries) {
     Download_history(
       isbn = isbn,
       path = path,
-      format = format
+      format = format,
     )
   )
 }

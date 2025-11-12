@@ -1,0 +1,14 @@
+CREATE TABLE pdf_extra_download_history (
+  isbn TEXT PRIMARY KEY NOT NULL
+);
+
+insertDownload:
+INSERT OR REPLACE INTO pdf_extra_download_history
+VALUES ?;
+
+isDownloaded:
+SELECT EXISTS (
+  SELECT *
+  FROM pdf_extra_download_history
+  WHERE isbn =?
+);
