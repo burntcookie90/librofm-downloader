@@ -8,6 +8,7 @@ import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
 import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.DownloadItem
+import com.vishnurajeevan.libroabs.db.writer.DownloadPdfExtraItem
 import com.vishnurajeevan.libroabs.db.writer.TrackerWishlistSyncStatus
 import com.vishnurajeevan.libroabs.healthcheck.HealthcheckApi
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
@@ -235,7 +236,7 @@ class App(
           processingSemaphore.withPermit {
             val targetDir = targetDir(book).also { it.mkdirs() }
             lfdLogger.log("Downloading ${book.title}")
-            val result = when (serverInfo.format) {
+            when (serverInfo.format) {
               BookFormat.MP3 -> {
                 downloadMp3sAndRename(book, targetDir)
                 LibroDownloadItem(
@@ -299,14 +300,6 @@ class App(
                 }
               }
             }
-            if (serverInfo.downloadExtras) {
-              libroClient.downloadPdfExtras(
-                isbn = book.isbn,
-                data = book.audiobook_info.pdf_extras,
-                targetDirectory = targetDir
-              )
-            }
-            result
           }
         }
       }
@@ -320,6 +313,48 @@ class App(
           )
         )
       }
+
+    if (serverInfo.downloadExtras) {
+      localLibrary.audiobooks
+        .let {
+          if (serverInfo.limit == -1) {
+            it
+          } else {
+            it.take(serverInfo.limit)
+          }
+        }
+        .filter {
+          if (!overwrite) {
+            !downloadHistoryRepo.pdfExtrasDownloaded(it.isbn)
+          } else {
+            true
+          }
+        }
+        .map { book ->
+          processingScope.async {
+            processingSemaphore.withPermit {
+              val targetDir = targetDir(book).also { it.mkdirs() }
+              libroClient.downloadPdfExtras(
+                isbn = book.isbn,
+                data = book.audiobook_info.pdf_extras,
+                targetDirectory = targetDir
+              )
+              DownloadPdfExtraItem(
+                isbn = book.isbn
+              )
+            }
+          }
+        }
+        .awaitAll()
+        .forEach {
+          dbWriter.write(
+            DownloadPdfExtraItem(
+              isbn = it.isbn
+            )
+          )
+        }
+    }
+
   }
 
   private suspend fun syncOwned() {
