@@ -1,0 +1,13 @@
+query MyOwned($id: Int!) {
+  list_books(where: {list: {name: {_eq: "Owned"}, user_id: {_eq: $id}}}) {
+    id
+    book {
+      title
+    }
+    edition {
+      id
+      isbn_13
+      title
+    }
+  }
+}

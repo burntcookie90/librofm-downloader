@@ -1,0 +1,5 @@
+mutation addBook($bookId: Int!) {
+  insert_user_book(object: {book_id: $bookId, status_id: 1}) {
+    id
+  }
+}

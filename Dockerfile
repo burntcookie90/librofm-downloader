@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew dependencies --no-daemon -
 COPY server ./server
 
 # Build the project efficiently
-RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:installDist --no-daemon
+RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:app:installDist --no-daemon
 
 # Use a minimal runtime image
 FROM eclipse-temurin:21-jre-alpine AS runtime
@@ -46,11 +46,13 @@ ENV \
     PARALLEL_COUNT=1 \
     PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE" \
     HEALTHCHECK_ID="" \
-    HEALTHCHECK_HOST="https://hc-ping.com"
+    HEALTHCHECK_HOST="https://hc-ping.com" \
+    HARDCOVER_TOKEN="" \
+    HARDCOVER_SYNC_MODE="ALL"
 
 WORKDIR /app
 COPY scripts/run.sh ./
-COPY --from=build /app/server/build/install/server ./
+COPY --from=build /app/server/app/build/install/app ./
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/app/run.sh"]

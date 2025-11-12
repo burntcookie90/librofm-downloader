@@ -1,0 +1,17 @@
+query MyWantToRead {
+  me {
+    user_books(where: {status_id: {_eq: 1} }) {
+      book {
+        id
+        title
+        editions(where: {reading_format: {format: { _eq:"Listened"}}}) {
+          reading_format {
+            id
+            format
+          }
+          isbn_13
+        }
+      }
+    }
+  }
+}

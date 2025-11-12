@@ -51,6 +51,19 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
 
 Changing your path pattern down the road will cause books to redownload, as the existence of the known file structure is how we determine a book has already been downloaded.
 
+### Tracker Syncing
+
+#### Hardcover
+
+`HARDCOVER_SYNC_MODE` controls the sync mode to your hardcover book tracker:
+```declarative
+  LIBRO_WISHLISTS_TO_HARDCOVER // Sync Libro wishlists to Hardcover
+  LIBRO_OWNED_TO_HARDCOVER // DEFAULT Sync Libro owned books to Hardcover
+  LIBRO_ALL_TO_HARDCOVER // Sync both Libro wishlist and owned books to Hardcover
+  HARDCOVER_WANT_TO_READ_TO_LIBRO // Sync Hardcover want-to-read books to Libro
+  ALL // CAREFUL as this can cause double syncs. The service will remember what was synced, but you'll need to manaully clean up anything on hardcover or librofm
+```
+
 ### Docker Compose Example
 ```
 services:
@@ -60,19 +73,22 @@ services:
       - /mnt/runtime/appdata/librofm-downloader:/data
       - /mnt/user/media/audiobooks:/media
     ports:
-      # optional if you want to use the /update webhook
+      # optional if you want to use the /update webhook or webui
       - 8080:8080 
     environment:
       - LIBRO_FM_USERNAME=<>
       - LIBRO_FM_PASSWORD=<>
-      - FORMAT="MP3/M4B_MP3_FALLBACK/M4B_CONVERT_FALLBACK" #choose one `M4B_MP3_FALLBACK` is default
       # extra optional: setting these enables them, dont add them if you dont want them.
+      - FORMAT="M4B_MP3_FALLBACK/MP3/M4B_CONVERT_FALLBACK" #choose one `M4B_MP3_FALLBACK` is default
       - PARALLEL_COUNT="2" #increase parallel processing limit, default is 1, careful with memory usage!
       - LOG_LEVEL="NONE/INFO/VERBOSE"
       - SYNC_INTERVAL="h/d/w" #choose one
       # MP3 / M4B_MP3_FALLBACK only
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
+      - HARDCOVER_TOKEN=<>
+      - SKIP_TRACKING_ISBNS=<>
+      - HEALTHCHECK_ID=<>
 ```
 
 To be notified when sync is failing visit https://healthchecks.io, create a check, and specify

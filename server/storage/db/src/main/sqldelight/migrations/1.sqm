@@ -1,0 +1,6 @@
+import kotlin.Boolean;
+
+CREATE TABLE tracker_wishlist_sync_status (
+  isbn TEXT PRIMARY KEY NOT NULL,
+  is_sync_successful INTEGER AS Boolean NOT NULL
+);
