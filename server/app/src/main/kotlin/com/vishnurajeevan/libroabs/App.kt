@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs
 
+import com.vishnurajeevan.libro.webhook.WebhookApi
 import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
 import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
@@ -70,6 +71,7 @@ class App(
   private val dbWriter: DbWriter,
   private val targetDir: (Book) -> File,
   private val trackerWishlistSyncStatusRepo: TrackerWishlistSyncStatusRepo,
+  private val webhookApi: WebhookApi,
 ) {
 
   suspend fun run() {
@@ -304,7 +306,10 @@ class App(
         }
       }
       .awaitAll()
-      .forEach {
+      .forEachIndexed { index, it ->
+        if (index == 0) {
+          serverInfo.webhookUrls.forEach { webhookApi.postToWebhook(it) }
+        }
         dbWriter.write(
           DownloadItem(
             isbn = it.isbn,
@@ -346,7 +351,10 @@ class App(
           }
         }
         .awaitAll()
-        .forEach {
+        .forEachIndexed { index, it ->
+          if (index == 0) {
+            serverInfo.webhookUrls.forEach { webhookApi.postToWebhook(it) }
+          }
           dbWriter.write(
             DownloadPdfExtraItem(
               isbn = it.isbn
