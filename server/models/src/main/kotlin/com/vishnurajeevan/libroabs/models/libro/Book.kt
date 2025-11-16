@@ -22,7 +22,8 @@ data class Book(
 data class BookInfo(
   val narrators: List<String>,
   val duration: Int, // Total duration in seconds
-  val track_count: Int
+  val track_count: Int,
+  val pdf_extras: List<PdfExtra> = emptyList()
 )
 
 @Serializable
@@ -35,5 +36,10 @@ data class Chapter(
   val title: String,
   val startTimeMs: Long,
   val endTimeMs: Long
+)
+
+@Serializable
+data class PdfExtra(
+  val filename: String,
 )
 

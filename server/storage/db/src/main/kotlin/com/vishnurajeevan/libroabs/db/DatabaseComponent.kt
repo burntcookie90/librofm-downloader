@@ -34,4 +34,8 @@ interface DatabaseComponent {
   @SingleIn(AppScope::class)
   @Provides
   fun trackerWishlistQueries(db: Database): TrackerWishlistSyncStatusQueries = db.trackerWishlistSyncStatusQueries
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun pdfExtrasQueries(db: Database): PdfExtraDownloadHistoryQueries = db.pdfExtraDownloadHistoryQueries
 }
