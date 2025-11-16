@@ -8,6 +8,7 @@ import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
 import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.DownloadItem
+import com.vishnurajeevan.libroabs.db.writer.DownloadPdfExtraItem
 import com.vishnurajeevan.libroabs.db.writer.TrackerWishlistSyncStatus
 import com.vishnurajeevan.libroabs.healthcheck.HealthcheckApi
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
@@ -111,26 +112,32 @@ class App(
     delay(delay)
     processLibrary(overwrite)
     delay(delay)
-    when (serverInfo.hardcoverSyncMode) {
-      TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER -> {
-        trackerConnector?.syncWishlistToConnector()
-      }
-      TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER -> {
-        syncOwned()
-      }
-      TrackerSyncMode.LIBRO_ALL_TO_HARDCOVER -> {
-        trackerConnector?.syncWishlistToConnector()
-        syncOwned()
-      }
-      TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO -> {
-        trackerConnector?.syncWishlistFromConnector()
-      }
-      TrackerSyncMode.ALL -> {
-        trackerConnector?.syncWishlistToConnector()
-        delay(delay)
-        syncOwned()
-        delay(delay)
-        trackerConnector?.syncWishlistFromConnector()
+    if (trackerConnector != null) {
+      when (serverInfo.hardcoverSyncMode) {
+        TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER -> {
+          trackerConnector.syncWishlistToConnector()
+        }
+
+        TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER -> {
+          syncOwned()
+        }
+
+        TrackerSyncMode.LIBRO_ALL_TO_HARDCOVER -> {
+          trackerConnector.syncWishlistToConnector()
+          syncOwned()
+        }
+
+        TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO -> {
+          trackerConnector.syncWishlistFromConnector()
+        }
+
+        TrackerSyncMode.ALL -> {
+          trackerConnector.syncWishlistToConnector()
+          delay(delay)
+          syncOwned()
+          delay(delay)
+          trackerConnector.syncWishlistFromConnector()
+        }
       }
     }
     healthCheckClient.pingWithToken()
@@ -306,6 +313,48 @@ class App(
           )
         )
       }
+
+    if (serverInfo.downloadExtras) {
+      localLibrary.audiobooks
+        .let {
+          if (serverInfo.limit == -1) {
+            it
+          } else {
+            it.take(serverInfo.limit)
+          }
+        }
+        .filter {
+          if (!overwrite) {
+            !downloadHistoryRepo.pdfExtrasDownloaded(it.isbn)
+          } else {
+            true
+          }
+        }
+        .map { book ->
+          processingScope.async {
+            processingSemaphore.withPermit {
+              val targetDir = targetDir(book).also { it.mkdirs() }
+              libroClient.downloadPdfExtras(
+                isbn = book.isbn,
+                data = book.audiobook_info.pdf_extras,
+                targetDirectory = targetDir
+              )
+              DownloadPdfExtraItem(
+                isbn = book.isbn
+              )
+            }
+          }
+        }
+        .awaitAll()
+        .forEach {
+          dbWriter.write(
+            DownloadPdfExtraItem(
+              isbn = it.isbn
+            )
+          )
+        }
+    }
+
   }
 
   private suspend fun syncOwned() {
