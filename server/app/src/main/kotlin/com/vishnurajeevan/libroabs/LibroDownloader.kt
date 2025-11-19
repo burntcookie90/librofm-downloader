@@ -122,9 +122,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       skipTrackingIsbns = skipTrackingIsbns,
       hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL
     )
-    println(serverInfo.prettyPrint())
 
     val graph = AppComponent::class.create(serverInfo)
+    graph.logger.i(serverInfo.prettyPrint())
 
     graph.storageMigrator.migrate()
 
