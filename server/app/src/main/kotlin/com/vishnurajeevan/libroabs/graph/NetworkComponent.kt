@@ -32,7 +32,7 @@ interface NetworkComponent {
     install(Logging) {
       logger = object : Logger {
         override fun log(message: String) {
-          _logger.log(message)
+          _logger.v(message)
         }
 
       }

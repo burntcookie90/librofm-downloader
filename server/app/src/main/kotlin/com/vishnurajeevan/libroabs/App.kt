@@ -83,7 +83,7 @@ class App(
     }
 
     appScope.launch {
-      lfdLogger.log("Sync Interval: ${serverInfo.syncInterval}")
+      lfdLogger.v("Sync Interval: ${serverInfo.syncInterval}")
       val syncIntervalTimeUnit = when (serverInfo.syncInterval) {
         "h" -> 1.hours
         "d" -> 1.days
@@ -93,7 +93,7 @@ class App(
 
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat { _, _ ->
-          lfdLogger.log("Checking library on pulse!")
+          lfdLogger.i("Checking library on pulse!")
           fullUpdate()
         }
     }
@@ -146,7 +146,7 @@ class App(
   }
 
   private suspend fun TrackerConnector.syncWishlistFromConnector() {
-    lfdLogger.log("Syncing Wishlist from Tracker")
+    lfdLogger.v("Syncing Wishlist from Tracker")
     libroClient.syncWishlist(
       getWantedBooks()
         .flatMap { books -> books.connectorAudioBook.map { it.isbn13 } }
@@ -159,7 +159,7 @@ class App(
     .filterNotNull()
 
   private suspend fun TrackerConnector.syncWishlistToConnector() {
-    lfdLogger.log("Syncing Wishlist to Tracker")
+    lfdLogger.v("Syncing Wishlist to Tracker")
     val existingWantedBooks = getWantedBooks().mapIsbns()
     val ownedBooks = getOwnedBooks().mapIsbns()
     val readBooks = getReadBooks().mapIsbns()
@@ -237,7 +237,7 @@ class App(
         processingScope.async {
           processingSemaphore.withPermit {
             val targetDir = targetDir(book).also { it.mkdirs() }
-            lfdLogger.log("Downloading ${book.title}")
+            lfdLogger.v("Downloading ${book.title}")
             when (serverInfo.format) {
               BookFormat.MP3 -> {
                 downloadMp3sAndRename(book, targetDir)
@@ -264,7 +264,7 @@ class App(
                   }
 
                   else -> {
-                    lfdLogger.log("M4B download for ${book.title} failed, falling back to MP3")
+                    lfdLogger.v("M4B download for ${book.title} failed, falling back to MP3")
                     downloadMp3sAndRename(book, targetDir)
                     LibroDownloadItem(
                       isbn = book.isbn,
@@ -290,7 +290,7 @@ class App(
                   }
 
                   else -> {
-                    lfdLogger.log("M4B download for ${book.title} failed, falling back to conversion")
+                    lfdLogger.v("M4B download for ${book.title} failed, falling back to conversion")
                     downloadMp3sAndRename(book, targetDir)
                     convertBookToM4b(book)
                     LibroDownloadItem(
@@ -367,7 +367,7 @@ class App(
 
   private suspend fun syncOwned() {
     val localLibrary = libroClient.getLocalLibrary()
-    lfdLogger.log("Syncing Owned to Tracker")
+    lfdLogger.v("Syncing Owned to Tracker")
     val isbn13s = localLibrary.audiobooks.map { it.isbn }
     val editions: List<ConnectorBook> = trackerConnector?.getEditions(isbn13s).orEmpty()
     val editionsNotFound = isbn13s.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
@@ -458,7 +458,7 @@ class App(
     if (!targetDir.exists()
       && targetDir.listFiles { it.extension == "mp3" }.isEmpty()
     ) {
-      lfdLogger.log("Book ${book.title} is not downloaded yet!")
+      lfdLogger.v("Book ${book.title} is not downloaded yet!")
       targetDir.mkdirs()
       downloadMetaData = downloadBookAsMp3s(book, targetDir)
     }
@@ -466,7 +466,7 @@ class App(
     val chapterFiles =
       targetDir.listFiles { file -> file.extension == "mp3" }
     if (chapterFiles == null || chapterFiles.isEmpty()) {
-      lfdLogger.log("Book ${book.title} does not have mp3 files downloaded. Downloading the book again.")
+      lfdLogger.v("Book ${book.title} does not have mp3 files downloaded. Downloading the book again.")
       downloadMetaData = downloadBookAsMp3s(book, targetDir)
     }
 
@@ -474,7 +474,7 @@ class App(
       downloadMetaData = libroClient.fetchMp3DownloadMetadata(book.isbn)
     }
 
-    lfdLogger.log("Converting ${book.title} from mp3 to m4b.")
+    lfdLogger.v("Converting ${book.title} from mp3 to m4b.")
 
     if (!serverInfo.dryRun) {
       ffmpegClient.convertBookToM4b(
@@ -484,7 +484,7 @@ class App(
         audioQuality = serverInfo.audioQuality
       )
 
-      lfdLogger.log("Deleting obsolete mp3 files for ${book.title}")
+      lfdLogger.v("Deleting obsolete mp3 files for ${book.title}")
 
       deleteMp3Files(targetDir)
     }

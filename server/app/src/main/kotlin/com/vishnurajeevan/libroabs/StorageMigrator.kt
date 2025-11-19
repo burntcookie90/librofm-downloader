@@ -50,7 +50,7 @@ class StorageMigrator(
         }
       // We need to prefill the download history with the old filesystem based history
       if (File(serverInfo.mediaDir).listFiles().isNotEmpty()) {
-        lfdLogger.log("Migrating to file based history")
+        lfdLogger.v("Migrating from file based history")
         localLibrary.getData().audiobooks
           .forEach { book ->
             val targetDir = targetDir(book)

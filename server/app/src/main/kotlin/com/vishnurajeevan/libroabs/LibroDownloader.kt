@@ -127,9 +127,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
       webhookUrls = webhookUrls
     )
-    println(serverInfo.prettyPrint())
 
     val graph = AppComponent::class.create(serverInfo)
+    graph.logger.i(serverInfo.prettyPrint())
 
     graph.storageMigrator.migrate()
 
