@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.options.split
 import com.github.ajalt.clikt.parameters.options.varargValues
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.enum
@@ -76,6 +77,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private val healthChecksIoOptions by HealthchecksIoOptionGroup().cooccurring()
   private val hardcoverOptions by HardcoverOptionGroup().cooccurring()
+  private val webhookUrls by option("--webhook-urls", envvar = "WEBHOOK_URLS").split(",")
+    .default(emptyList())
+
   private val skipTrackingIsbns: List<String> by option("--skip-tracking-isbns", envvar = "SKIP_TRACKING_ISBNS")
     .varargValues()
     .default(emptyList())
@@ -120,7 +124,8 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       ffprobePath = ffprobePath,
       audioQuality = audioQuality,
       skipTrackingIsbns = skipTrackingIsbns,
-      hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL
+      hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
+      webhookUrls = webhookUrls
     )
     println(serverInfo.prettyPrint())
 

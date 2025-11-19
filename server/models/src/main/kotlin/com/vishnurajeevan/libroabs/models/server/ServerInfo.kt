@@ -29,6 +29,7 @@ data class ServerInfo(
   val audioQuality: String,
   val skipTrackingIsbns: List<String>,
   val hardcoverSyncMode: TrackerSyncMode,
+  val webhookUrls: List<String> = emptyList()
 ) {
   fun prettyPrint(): String {
     return """
@@ -49,6 +50,7 @@ data class ServerInfo(
       |  Health Check ID: $healthCheckId
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
+      |  Webhook Urls: $webhookUrls
     """.trimMargin()
   }
 }
