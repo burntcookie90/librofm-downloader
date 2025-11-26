@@ -1,6 +1,6 @@
 [versions]
 apollo = "4.3.3"
-cardiologist = "0.4.0"
+cardiologist = "0.8.0"
 clikt = "5.0.3"
 ffmpeg = "0.8.0"
 jaudiotagger = "3.0.1"
