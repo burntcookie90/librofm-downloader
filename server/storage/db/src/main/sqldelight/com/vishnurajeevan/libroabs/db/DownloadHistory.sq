@@ -1,4 +1,5 @@
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat;
+import kotlin.Boolean;
 
 CREATE TABLE download_history(
   isbn TEXT PRIMARY KEY NOT NULL,

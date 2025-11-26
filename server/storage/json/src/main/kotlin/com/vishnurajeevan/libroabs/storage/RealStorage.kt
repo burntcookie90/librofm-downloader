@@ -25,7 +25,10 @@ class RealStorage<T : Any>(
   private val logger: Logger,
 ) : Storage<T> {
   private val scope = CoroutineScope(dispatcher + SupervisorJob())
-  private val json = Json { prettyPrint = true }
+  private val json = Json {
+    prettyPrint = true
+    ignoreUnknownKeys = true
+  }
 
   private val writeQueue: MutableStateFlow<T?> = MutableStateFlow(null)
   private var data: T
@@ -38,7 +41,7 @@ class RealStorage<T : Any>(
   init {
     runBlocking {
       if (!file.exists()) {
-        logger.log("Creating storage for ${file.path}")
+        logger.v("Creating storage for ${file.path}")
         file.createNewFile()
         file.writeText(json.encodeToString(serializer, initial))
       }
@@ -47,7 +50,7 @@ class RealStorage<T : Any>(
     scope.launch {
       writeQueue.filterNotNull().collect {
         mutex.withLock {
-          logger.log("Writing $it to storage")
+          logger.v("Writing $it to storage")
           data = it
         }
       }
@@ -59,7 +62,7 @@ class RealStorage<T : Any>(
   override suspend fun update(update: suspend (T) -> T) {
     scope.launch {
       val new = update(data)
-      logger.log("dispatching $new to storage ${file.path}")
+      logger.v("dispatching $new to storage ${file.path}")
       writeQueue.emit(new)
     }
   }

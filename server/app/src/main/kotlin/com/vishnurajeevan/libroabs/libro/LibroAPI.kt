@@ -5,6 +5,7 @@ import com.vishnurajeevan.libroabs.models.libro.BookDetailsResponse
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.models.libro.PdfExtraResponse
 import com.vishnurajeevan.libroabs.models.libro.TokenMetadata
 import com.vishnurajeevan.libroabs.models.libro.WishlistResponse
 import de.jensklingenberg.ktorfit.Response
@@ -21,6 +22,13 @@ interface LibroAPI {
     @Header("Authorization") authToken: String,
     @Query("page") page: Int = 1
   ): LibraryMetadata
+
+  @GET("api/v10/library/{isbn}/pdf_extra_url")
+  suspend fun fetchPdfExtraUrl(
+    @Header("Authorization") authToken: String,
+    @Path("isbn") isbn: String,
+    @Query("filename") filename: String
+  ): PdfExtraResponse
 
   @GET("api/v10/explore/audiobook_details/{isbn}")
   suspend fun fetchAudiobookDetails(

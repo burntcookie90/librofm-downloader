@@ -1,7 +1,6 @@
 package com.vishnurajeevan.libroabs.libro
 
 import com.vishnurajeevan.libroabs.db.repo.LibroFmWishlistSyncStatusRepo
-import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.LibroFmWishlistSyncStatus
 import com.vishnurajeevan.libroabs.models.Logger
@@ -11,6 +10,7 @@ import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.DownloadPart
 import com.vishnurajeevan.libroabs.models.libro.LoginRequest
 import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
+import com.vishnurajeevan.libroabs.models.libro.PdfExtra
 import com.vishnurajeevan.libroabs.models.server.M4bMetadata
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.storage.Storage
@@ -104,7 +104,7 @@ class LibroApiHandler(
 
   suspend fun downloadM4b(m4bUrl: String, targetDirectory: File) {
     if (!dryRun) {
-      lfdLogger.log("Downloading M4B: $m4bUrl")
+      lfdLogger.v("Downloading M4B: $m4bUrl")
       val url = Url(m4bUrl)
       val contentDisposition = url.parameters["response-content-disposition"]!!
 
@@ -120,7 +120,7 @@ class LibroApiHandler(
     data.forEachIndexed { index, part ->
       if (!dryRun) {
         val url = part.url
-        lfdLogger.log("downloading part ${index + 1}")
+        lfdLogger.v("downloading part ${index + 1}")
         val destinationFile = File(targetDirectory, "part-$index.zip")
         downloadFile(Url(url), destinationFile)
 
@@ -151,6 +151,27 @@ class LibroApiHandler(
     }
   }
 
+  suspend fun downloadPdfExtras(
+    isbn: String,
+    data: List<PdfExtra>,
+    targetDirectory: File
+  ) {
+    data.forEach { pdfExtra ->
+      lfdLogger.v("Download PDF Extras for $isbn")
+      val downloadUrl = libroAPI.fetchPdfExtraUrl(
+        authToken = token,
+        isbn = isbn,
+        filename = pdfExtra.filename
+      )
+      if (!dryRun) {
+        downloadFile(
+          url = Url(downloadUrl.pdf_url),
+          destinationFile = File(targetDirectory, pdfExtra.filename)
+        )
+      }
+    }
+  }
+
   suspend fun syncWishlist(isbns: List<String>) = withContext(ioDispatcher) {
     isbns.minus(
       fetchWishlist()
@@ -161,7 +182,7 @@ class LibroApiHandler(
         wishlistSyncStatusRepo.getSyncedIsbns()
       )
       .forEach { isbn ->
-        lfdLogger.log("Syncing wishlist for $isbn")
+        lfdLogger.v("Syncing wishlist for $isbn")
         val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
         val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
         dbWriter.write(LibroFmWishlistSyncStatus(isbn, status))
@@ -179,7 +200,7 @@ class LibroApiHandler(
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) {
-    lfdLogger.log(
+    lfdLogger.v(
       """
       ----
       Downloading $url to ${destinationFile.name}

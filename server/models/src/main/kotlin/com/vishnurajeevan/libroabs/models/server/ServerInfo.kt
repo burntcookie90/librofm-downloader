@@ -16,6 +16,7 @@ data class ServerInfo(
   val renameChapters: Boolean,
   val writeTitleTag: Boolean,
   val format: BookFormat,
+  val downloadExtras: Boolean,
   val logLevel: ApplicationLogLevel,
   val limit: Int,
   val pathPattern: String,
@@ -28,6 +29,7 @@ data class ServerInfo(
   val audioQuality: String,
   val skipTrackingIsbns: List<String>,
   val hardcoverSyncMode: TrackerSyncMode,
+  val webhookUrls: List<String> = emptyList()
 ) {
   fun prettyPrint(): String {
     return """
@@ -40,6 +42,7 @@ data class ServerInfo(
       |  Rename Chapters: $renameChapters
       |  Write Title Tag: $writeTitleTag
       |  Format: $format
+      |  Download Extras: $downloadExtras
       |  Log Level: $logLevel
       |  Limit: $limit
       |  Path Pattern: $pathPattern
@@ -47,6 +50,7 @@ data class ServerInfo(
       |  Health Check ID: $healthCheckId
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
+      |  Webhook Urls: $webhookUrls
     """.trimMargin()
   }
 }

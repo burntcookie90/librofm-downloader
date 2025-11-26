@@ -24,6 +24,8 @@ abstract class AppComponent(
 ) {
   abstract val app: App
 
+  abstract val logger: Logger
+
   abstract val storageMigrator: StorageMigrator
 
   abstract val libroClient: LibroApiHandler
@@ -71,7 +73,7 @@ abstract class AppComponent(
   fun providesTargetDir(lfdLogger: Logger): (Book) -> File = { book ->
     File("${serverInfo.mediaDir}/${book.createPath(serverInfo.pathPattern)}")
       .also {
-        lfdLogger.log("Target Directory: $it")
+        lfdLogger.v("Target Directory: $it")
       }
   }
 

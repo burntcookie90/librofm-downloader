@@ -80,7 +80,7 @@ class FfmpegClient(
       val durationNs = book.audiobook_info.duration * TimeUnit.SECONDS.toNanos(1)
       override fun progress(progress: Progress) {
         val percentage = progress.out_time_ns.toDouble() / durationNs.toDouble();
-        lfdLogger.log(
+        lfdLogger.v(
           String.format(
             "[%.0f%%] status:%s time:%s ms speed:%.2fx",
             percentage * 100,
@@ -96,7 +96,7 @@ class FfmpegClient(
     listFile.delete()
     metadataFile.delete()
 
-    lfdLogger.log("M4B file created: ${newFile.absolutePath}")
+    lfdLogger.v("M4B file created: ${newFile.absolutePath}")
   }
 
   private fun downloadCoverImage(coverUrl: String, outputFile: File) {
@@ -106,9 +106,9 @@ class FfmpegClient(
       URI(fullUrl).toURL().openStream().use { input ->
         Files.copy(input, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
       }
-      lfdLogger.log("Cover image saved to ${outputFile.absolutePath}")
+      lfdLogger.v("Cover image saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
-      lfdLogger.log("Failed to download cover image: ${e.message}")
+      lfdLogger.v("Failed to download cover image: ${e.message}")
     }
   }
 
