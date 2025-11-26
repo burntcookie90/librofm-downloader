@@ -23,22 +23,14 @@ import com.vishnurajeevan.libroabs.models.libro.Tracks
 import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
-import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.server.setupServer
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import me.tatarka.inject.annotations.Inject
@@ -47,9 +39,11 @@ import org.jaudiotagger.tag.FieldKey
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 @Inject
 @SingleIn(AppScope::class)
@@ -70,6 +64,7 @@ class App(
   private val targetDir: (Book) -> File,
   private val trackerWishlistSyncStatusRepo: TrackerWishlistSyncStatusRepo,
 ) {
+  @OptIn(ExperimentalTime::class)
 
   suspend fun run() {
     libroClient.fetchLoginData(serverInfo.libroUserName, serverInfo.libroPassword)
@@ -89,9 +84,13 @@ class App(
       }
 
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
-        .beat { _, _ ->
+        .beat {
           lfdLogger.log("Checking library on pulse!")
-          fullUpdate()
+          try {
+            fullUpdate()
+          } catch (e: Exception) {
+            lfdLogger.log("Pulse update failed: ${e.message}")
+          }
         }
     }
 
