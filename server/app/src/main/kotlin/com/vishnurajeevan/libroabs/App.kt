@@ -89,10 +89,12 @@ class App(
       Clock.System.fixedPeriodPulse(syncIntervalTimeUnit)
         .beat {
           lfdLogger.i("Checking library on pulse!")
-          try {
-            fullUpdate()
-          } catch (e: Exception) {
-            lfdLogger.i("Pulse update failed: ${e.message}")
+          supervisorScope {
+            try {
+              fullUpdate()
+            } catch (e: Exception) {
+              lfdLogger.i("Pulse update failed: ${e.message}")
+            }
           }
         }
     }
