@@ -37,6 +37,7 @@ The application supports the following path tokens:
 FIRST_AUTHOR - The first author in the list of authors
 ALL_AUTHORS - All authors in the list of authors separated by ','
 SERIES_NAME - The series name, if it exists
+SERIES_NUM - The books respective series number, if it exists
 BOOK_TITLE - The book title
 ISBN - The ISBN of the book
 FIRST_NARRATOR - The first narrator in the list of narrators

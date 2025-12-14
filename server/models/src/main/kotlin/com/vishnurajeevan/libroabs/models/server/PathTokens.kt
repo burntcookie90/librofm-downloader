@@ -16,24 +16,36 @@ enum class PathTokens {
   PUBLICATION_YEAR,
   PUBLICATION_MONTH,
   PUBLICATION_DAY,
+  SERIES_NUM,
+}
+
+fun PathTokens.convert(book: Book): String {
+    return when(this) {
+        PathTokens.FIRST_AUTHOR -> book.authors.first().toString()
+        PathTokens.ALL_AUTHORS ->  book.authors.joinToString(", ").toString()
+        PathTokens.SERIES_NAME ->  book.series?.toString() ?: ""
+        PathTokens.BOOK_TITLE ->  book.title.toString()
+        PathTokens.ISBN ->  book.isbn.toString()
+        PathTokens.FIRST_NARRATOR ->  book.audiobook_info.narrators.first().toString()
+        PathTokens.ALL_NARRATORS ->  book.audiobook_info.narrators.joinToString(", ").toString()
+        PathTokens.PUBLICATION_YEAR ->  book.publication_date.toLocalDateTime(TimeZone.UTC).year.toString()
+        PathTokens.PUBLICATION_MONTH ->  book.publication_date.toLocalDateTime(TimeZone.UTC).month.number.toString()
+        PathTokens.PUBLICATION_DAY ->  book.publication_date.toLocalDateTime(TimeZone.UTC).dayOfMonth.toString()
+        PathTokens.SERIES_NUM -> book.series_num?.toString() ?: ""
+      }
 }
 
 fun Book.createPath(pathPattern: String): String {
-  return pathPattern.split("/")
+  return pathPattern
+    .split("/")
     .mapNotNull {
-      when(PathTokens.valueOf(it)) {
-        PathTokens.FIRST_AUTHOR -> authors.first()
-        PathTokens.ALL_AUTHORS -> authors.joinToString(", ")
-        PathTokens.SERIES_NAME -> series
-        PathTokens.BOOK_TITLE -> title
-        PathTokens.ISBN -> isbn
-        PathTokens.FIRST_NARRATOR -> audiobook_info.narrators.first()
-        PathTokens.ALL_NARRATORS -> audiobook_info.narrators.joinToString(", ")
-        PathTokens.PUBLICATION_YEAR -> publication_date.toLocalDateTime(TimeZone.UTC).year
-        PathTokens.PUBLICATION_MONTH -> publication_date.toLocalDateTime(TimeZone.UTC).month.number
-        PathTokens.PUBLICATION_DAY -> publication_date.toLocalDateTime(TimeZone.UTC).dayOfMonth
+      var pathReplace = it
+      for (token in PathTokens.entries) {
+        if (it.contains(token.toString())) {
+          pathReplace = pathReplace.replace(token.toString(), token.convert(this)) 
+        }
       }
+      pathReplace.takeIf { it != "" }
     }
     .joinToString("/")
 }
-
