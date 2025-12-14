@@ -72,6 +72,43 @@ class PathTokenTest {
   }
 
   @Test
+  fun testCustomInputPath() {
+    val pathPattern = "MyPrefix/FIRST_AUTHOR/BOOK_TITLE"
+    val expected = "MyPrefix/Jane Doe/The Great Novel"
+    assertEquals(expected, File(singleAuthorBook.createPath(pathPattern)).path)
+  }
+
+
+  @Test
+  fun testComplexCustomInputPath() {
+    val pathPattern = "MyPrefix/FIRST_AUTHOR/SERIES_NAME/[PUBLICATION_YEAR-PUBLICATION_MONTH-PUBLICATION_DAY] BOOK_TITLE"
+    val expected = "MyPrefix/Jane Doe/Amazing Series/[2024-3-19] The Great Novel"
+    assertEquals(expected, File(singleAuthorBook.createPath(pathPattern)).path)
+  }
+
+  
+  @Test
+  fun testSeriesNum() {
+    val pathPattern = "FIRST_AUTHOR/SERIES_NAME/SERIES_NUM - BOOK_TITLE"
+    val expected = "Jane Doe/Amazing Series/1 - The Great Novel"
+    assertEquals(expected, File(singleAuthorBook.createPath(pathPattern)).path)
+  }
+
+  @Test
+  fun testNullValuesSimple() {
+    val pathPattern = "ALL_AUTHORS/SERIES_NAME/BOOK_TITLE"
+    val expected = "John Doe, Jane Smith, Alex Johnson/Collaborative Work"
+    assertEquals(expected, File(multipleAuthorsBook.createPath(pathPattern)).path)
+  }
+
+  @Test
+  fun testNullValuesComplex() {
+    val pathPattern = "ALL_AUTHORS/[SERIES_NAME - FIRST_NARRATOR] BOOK_TITLE"
+    val expected = "John Doe, Jane Smith, Alex Johnson/[ - Voice Actor] Collaborative Work"
+    assertEquals(expected, File(multipleAuthorsBook.createPath(pathPattern)).path)
+  }
+
+  @Test
   fun testAuthorAllBookTitle() {
     val pathPattern = "ALL_AUTHORS/BOOK_TITLE"
     val expected = "John Doe, Jane Smith, Alex Johnson/Collaborative Work"
