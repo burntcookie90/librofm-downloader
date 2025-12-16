@@ -24,6 +24,10 @@ updates:
           - "com.google.devtools.ksp"
           - "de.jensklingenberg.ktorfit:*"
           - "dev.zacsweers.redacted"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
 registries:
   maven-google:
     type: "maven-repository"
