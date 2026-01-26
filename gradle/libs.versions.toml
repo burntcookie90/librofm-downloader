@@ -1,5 +1,5 @@
 [versions]
-apollo = "4.3.3"
+apollo = "4.4.0"
 cardiologist = "0.8.0"
 clikt = "5.0.3"
 ffmpeg = "0.8.0"
