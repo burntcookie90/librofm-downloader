@@ -50,8 +50,6 @@ PUBLICATION_DAY - Day book was published (numerical)
 You can set the env var `PATH_PATTERN` to change the default path pattern. The default is:
 `PATH_PATTERN=FIRST_AUTHOR/BOOK_TITLE`
 
-Changing your path pattern down the road will cause books to redownload, as the existence of the known file structure is how we determine a book has already been downloaded.
-
 ### Tracker Syncing
 
 #### Hardcover
