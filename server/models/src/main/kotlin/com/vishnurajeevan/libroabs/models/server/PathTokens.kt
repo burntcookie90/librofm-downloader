@@ -35,14 +35,30 @@ fun PathTokens.convert(book: Book): String {
       }
 }
 
+private val optionalGroupPattern = Regex("\\{([^}]*?)\\}")
+
+private fun String.resolveOptionalGroups(book: Book): String {
+  return optionalGroupPattern.replace(this) { match ->
+    var resolved = match.groupValues[1]
+    for (token in PathTokens.entries) {
+      if (resolved.contains(token.toString())) {
+        val value = token.convert(book)
+        if (value.isEmpty()) return@replace ""
+        resolved = resolved.replace(token.toString(), value)
+      }
+    }
+    resolved
+  }
+}
+
 fun Book.createPath(pathPattern: String): String {
   return pathPattern
     .split("/")
     .mapNotNull {
-      var pathReplace = it
+      var pathReplace = it.resolveOptionalGroups(this)
       for (token in PathTokens.entries) {
-        if (it.contains(token.toString())) {
-          pathReplace = pathReplace.replace(token.toString(), token.convert(this)) 
+        if (pathReplace.contains(token.toString())) {
+          pathReplace = pathReplace.replace(token.toString(), token.convert(this))
         }
       }
       pathReplace.takeIf { it != "" }
