@@ -39,7 +39,7 @@ interface NetworkComponent {
       level = when (serverInfo.logLevel) {
         ApplicationLogLevel.NONE -> LogLevel.NONE
         ApplicationLogLevel.INFO -> LogLevel.INFO
-        ApplicationLogLevel.VERBOSE -> LogLevel.ALL
+        ApplicationLogLevel.VERBOSE -> LogLevel.INFO
       }
     }
   }
