@@ -39,6 +39,7 @@ ALL_AUTHORS - All authors in the list of authors separated by ','
 SERIES_NAME - The series name, if it exists
 SERIES_NUM - The books respective series number, if it exists
 BOOK_TITLE - The book title
+BOOK_SIBTITLE - The book subtitle, if it exists
 ISBN - The ISBN of the book
 FIRST_NARRATOR - The first narrator in the list of narrators
 ALL_NARRATORS - All narrators in the list of narrators separated by ','
