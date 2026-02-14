@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-alpine AS build
+FROM eclipse-temurin:25-alpine AS build
 ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dkotlin.incremental=true -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY server ./server
 RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:app:installDist --no-daemon
 
 # Use a minimal runtime image
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 LABEL maintainer="Vishnu Rajeevan <github@vishnu.email>"
 
 RUN apk add --no-cache \
