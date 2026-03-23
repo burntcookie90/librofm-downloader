@@ -17,7 +17,7 @@ ktor = "3.1.0"
 ktorfit = "2.7.2"
 logback = "1.5.28"
 redacted = "1.15.1"
-sqldelight = "2.2.1"
+sqldelight = "2.3.2"
 
 [libraries]
 apollo-runtime = { module = "com.apollographql.apollo:apollo-runtime", version.ref = "apollo" }
