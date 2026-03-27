@@ -14,6 +14,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.header
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -39,7 +40,7 @@ interface NetworkComponent {
       level = when (serverInfo.logLevel) {
         ApplicationLogLevel.NONE -> LogLevel.NONE
         ApplicationLogLevel.INFO -> LogLevel.INFO
-        ApplicationLogLevel.VERBOSE -> LogLevel.INFO
+        ApplicationLogLevel.VERBOSE -> LogLevel.HEADERS
       }
     }
   }
@@ -58,6 +59,7 @@ interface NetworkComponent {
     .httpClient(client.config {
       defaultRequest {
         contentType(ContentType.Application.Json)
+        header("X-LibroFm-AppVer", "7.34.8")
       }
       install(ContentNegotiation) {
         json(Json {

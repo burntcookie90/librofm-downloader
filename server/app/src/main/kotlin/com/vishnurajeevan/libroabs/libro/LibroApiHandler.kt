@@ -59,6 +59,7 @@ class LibroApiHandler(
             token = tokenData.access_token
           )
         }
+        println("Login success!")
       } else {
         println("Login failed!")
         throw IllegalArgumentException("failed login!")
