@@ -50,6 +50,20 @@ PUBLICATION_DAY - Day book was published (numerical)
 You can set the env var `PATH_PATTERN` to change the default path pattern. The default is:
 `PATH_PATTERN=FIRST_AUTHOR/BOOK_TITLE`
 
+If you want to have optional characters along with optional variables you can
+surround them with `{}`. For example:
+`PATH_PATTERN=FIRST_AUTHOR/SERIES_NAME/{SERIES_NUM }BOOK_TITLE`
+Means that if a book doesn't have a `SERIES_NUM` it _won't_ be prefixed with a
+space.
+
+For example:
+
+Adrian Tchaikovsky's _Service Model_ is not part of a series, so would be
+written to `Adrian Tchaikovsky/Service Model`.
+
+On the other hand Gregory Mcdonald's _Fletch_ is the first book in "The Fletch
+Mysteries" and as such would be saved to `Gregory Mcdonald/The Fletch Mysteries/1 Fletch`.
+
 Changing your path pattern down the road will cause books to redownload, as the existence of the known file structure is how we determine a book has already been downloaded.
 
 ### Tracker Syncing
