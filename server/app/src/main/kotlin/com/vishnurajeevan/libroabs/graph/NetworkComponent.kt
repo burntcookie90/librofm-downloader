@@ -54,12 +54,14 @@ interface NetworkComponent {
   }
 
   @Provides
-  fun libroApi(client: HttpClient): LibroAPI = Ktorfit.Builder()
+  fun libroApi(client: HttpClient, serverInfo: ServerInfo): LibroAPI = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
     .httpClient(client.config {
       defaultRequest {
         contentType(ContentType.Application.Json)
-        header("X-LibroFm-AppVer", "7.34.8")
+        serverInfo.libroFmHeaders.forEach { key, value ->
+          header(key, value)
+        }
       }
       install(ContentNegotiation) {
         json(Json {
