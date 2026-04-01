@@ -3,6 +3,7 @@ package com.vishnurajeevan.libroabs
 import com.github.ajalt.clikt.command.SuspendingCliktCommand
 import com.github.ajalt.clikt.command.main
 import com.github.ajalt.clikt.parameters.groups.cooccurring
+import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -93,6 +94,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
   private val ffprobePath by option("--ffprobe-path")
     .default("/usr/bin/ffprobe")
 
+  private val libroFmHeaders: List<String> by option("--libro-fm-headers", envvar = "LIBRO_FM_HEADERS")
+    .split(",")
+    .required()
+
   private val libroFmUsername by option("--libro-fm-username", envvar = "LIBRO_FM_USERNAME")
     .required()
 
@@ -103,6 +108,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
     val serverInfo = ServerInfo(
       libroUserName = libroFmUsername,
       libroPassword = libroFmPassword,
+      libroFmHeaders = libroFmHeaders.associate {
+        val split = it.split("=")
+        split[0] to split[1]
+      },
       port = port,
       dataDir = dataDir,
       mediaDir = mediaDir,
