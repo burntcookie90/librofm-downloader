@@ -2,7 +2,7 @@
 apollo = "4.4.1"
 cardiologist = "0.8.0"
 clikt = "5.1.0"
-ffmpeg = "0.8.0"
+ffmpeg = "0.9.1"
 jaudiotagger = "3.0.1"
 junit = "4.13.2"
 ksp = "2.3.3"
