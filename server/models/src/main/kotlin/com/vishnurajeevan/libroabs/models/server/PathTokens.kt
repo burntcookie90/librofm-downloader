@@ -17,6 +17,7 @@ enum class PathTokens {
   PUBLICATION_MONTH,
   PUBLICATION_DAY,
   SERIES_NUM,
+  BOOK_SUBTITLE,
 }
 
 fun PathTokens.convert(book: Book): String {
@@ -32,6 +33,7 @@ fun PathTokens.convert(book: Book): String {
         PathTokens.PUBLICATION_MONTH ->  book.publication_date.toLocalDateTime(TimeZone.UTC).month.number.toString()
         PathTokens.PUBLICATION_DAY ->  book.publication_date.toLocalDateTime(TimeZone.UTC).dayOfMonth.toString()
         PathTokens.SERIES_NUM -> book.series_num?.toString() ?: ""
+        PathTokens.BOOK_SUBTITLE -> book.subtitle ?: ""
       }
 }
 

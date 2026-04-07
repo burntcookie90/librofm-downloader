@@ -14,6 +14,7 @@ data class Book(
   val publication_date: Instant,
   val description: String,
   val genres: List<Genre>,
+  val subtitle: String? = null,
   val series: String? = null,
   val series_num: Int? = null
 )
