@@ -100,7 +100,7 @@ class App(
     }
 
     setupServer(
-      onUpdate = { fullUpdate(it) },
+      onUpdate = { fullUpdate(overwrite = it) },
       serverInfo = serverInfo
     ).start(wait = true)
   }
