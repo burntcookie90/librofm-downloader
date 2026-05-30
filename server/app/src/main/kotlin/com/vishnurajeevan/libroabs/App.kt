@@ -228,10 +228,12 @@ class App(
         }
       }
       .filter {
-        if (!overwrite) {
-          !downloadHistoryRepo.isDownloaded(it.isbn)
-        } else {
+        if (overwrite) {
           true
+        } else {
+          val isDownloaded = downloadHistoryRepo.isDownloaded(it.isbn)
+          lfdLogger.v("Download history | ${it.isbn} is downloaded: $isDownloaded")
+          !isDownloaded
         }
       }
       .map { book ->
