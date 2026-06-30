@@ -2,10 +2,10 @@ package com.vishnurajeevan.libroabs.healthcheck
 
 import com.vishnurajeevan.libroabs.models.graph.Named
 import de.jensklingenberg.ktorfit.Ktorfit
-import io.ktor.client.HttpClient
-import me.tatarka.inject.annotations.Provides
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import io.ktor.client.*
 
 @ContributesTo(AppScope::class)
 interface HealthCheckComponent {

@@ -1,17 +1,17 @@
 package com.vishnurajeevan.libro.webhook
 
 import de.jensklingenberg.ktorfit.Ktorfit
-import io.ktor.client.HttpClient
-import me.tatarka.inject.annotations.Provides
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import io.ktor.client.*
 
 @ContributesTo(AppScope::class)
 interface WebhookComponent {
   @Provides
   fun webhookApi(
     httpClient: HttpClient,
-  ) = Ktorfit.Builder()
+  ): WebhookApi = Ktorfit.Builder()
     .httpClient(httpClient)
     .build()
     .createWebhookApi()

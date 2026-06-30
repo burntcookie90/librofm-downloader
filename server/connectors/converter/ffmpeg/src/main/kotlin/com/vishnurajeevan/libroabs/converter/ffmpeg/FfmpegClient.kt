@@ -5,9 +5,11 @@ import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Chapter
 import com.vishnurajeevan.libroabs.models.libro.Tracks
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import me.tatarka.inject.annotations.Inject
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFmpegUtils
 import net.bramp.ffmpeg.FFprobe
@@ -16,8 +18,6 @@ import net.bramp.ffmpeg.probe.FFmpegFormat
 import net.bramp.ffmpeg.probe.FFmpegProbeResult
 import net.bramp.ffmpeg.progress.Progress
 import net.bramp.ffmpeg.progress.ProgressListener
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.BufferedWriter
 import java.io.File
 import java.net.URI

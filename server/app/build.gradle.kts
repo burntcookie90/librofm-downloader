@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.kotlinxSerialization)
   alias(libs.plugins.ktor)
   alias(libs.plugins.ktorfit)
+  alias(libs.plugins.metro)
   application
 }
 
@@ -44,12 +45,6 @@ dependencies {
   implementation(libs.ktor.server.resources)
   implementation(libs.ktorfit.lib)
   implementation(libs.ktorfit.response)
-
-  ksp(libs.kotlin.inject.compiler)
-  implementation(libs.kotlin.inject.runtime)
-  ksp(libs.kotlin.inject.anvil.compiler)
-  implementation(libs.kotlin.inject.anvil.runtime)
-  implementation(libs.kotlin.inject.anvil.runtime.optional)
 
   testImplementation(libs.kotlin.test.junit)
 }
