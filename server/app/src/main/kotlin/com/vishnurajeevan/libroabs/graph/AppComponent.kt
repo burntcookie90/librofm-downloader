@@ -6,29 +6,29 @@ import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
+import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.models.server.createPath
-import me.tatarka.inject.annotations.Provides
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.DependencyGraph
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import net.bramp.ffmpeg.FFmpeg
 import net.bramp.ffmpeg.FFmpegExecutor
 import net.bramp.ffmpeg.FFprobe
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
-import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
 
-@MergeComponent(AppScope::class)
-@SingleIn(AppScope::class)
-abstract class AppComponent(
-  @get:Provides val serverInfo: ServerInfo
-) {
-  abstract val app: App
+@DependencyGraph(scope = AppScope::class)
+interface AppComponent {
+  val serverInfo: ServerInfo
 
-  abstract val logger: Logger
+  val app: App
 
-  abstract val storageMigrator: StorageMigrator
+  val logger: Logger
 
-  abstract val libroClient: LibroApiHandler
+  val storageMigrator: StorageMigrator
+
+  val libroClient: LibroApiHandler
 
   @Named("healthcheck-host")
   @SingleIn(AppScope::class)
@@ -38,7 +38,7 @@ abstract class AppComponent(
   @Named("healthcheck-id")
   @SingleIn(AppScope::class)
   @Provides
-  fun hcioToken() = serverInfo.healthCheckId
+  fun hcioToken(): String? = serverInfo.healthCheckId
 
   @Named("hardcover-token")
   @SingleIn(AppScope::class)
@@ -52,21 +52,21 @@ abstract class AppComponent(
 
   @Named("ffprobePath")
   @Provides
-  fun ffprobePath() = serverInfo.ffprobePath
+  fun ffprobePath(): String = serverInfo.ffprobePath
 
   @Provides
-  fun appLogLevel() = serverInfo.logLevel
+  fun appLogLevel(): ApplicationLogLevel = serverInfo.logLevel
 
   @Provides
   @SingleIn(AppScope::class)
-  fun ffmpegExecutor() = FFmpegExecutor(
+  fun ffmpegExecutor(): FFmpegExecutor = FFmpegExecutor(
     FFmpeg(serverInfo.ffmpegPath),
     FFprobe(serverInfo.ffprobePath)
   )
 
   @Provides
   @Named("parallel")
-  fun parallelCount() = serverInfo.parallelCount
+  fun parallelCount(): Int = serverInfo.parallelCount
 
   @Provides
   @SingleIn(AppScope::class)
@@ -77,4 +77,8 @@ abstract class AppComponent(
       }
   }
 
+  @DependencyGraph.Factory
+  fun interface Factory {
+    fun create(@Provides serverInfo: ServerInfo): AppComponent
+  }
 }

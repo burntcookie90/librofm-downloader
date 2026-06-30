@@ -17,6 +17,7 @@ import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
+import dev.zacsweers.metro.Inject
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -26,7 +27,6 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import me.tatarka.inject.annotations.Inject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream

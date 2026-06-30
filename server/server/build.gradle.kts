@@ -1,8 +1,8 @@
 plugins {
-  alias(libs.plugins.ksp)
   alias(libs.plugins.kotlinJvm)
   alias(libs.plugins.kotlinxSerialization)
   alias(libs.plugins.ktor)
+  alias(libs.plugins.metro)
 }
 
 dependencies {
@@ -14,10 +14,4 @@ dependencies {
   implementation(libs.ktor.server.content.negotiation)
   implementation(libs.ktor.server.netty)
   implementation(libs.ktor.server.resources)
-
-  ksp(libs.kotlin.inject.compiler)
-  implementation(libs.kotlin.inject.runtime)
-  ksp(libs.kotlin.inject.anvil.compiler)
-  implementation(libs.kotlin.inject.anvil.runtime)
-  implementation(libs.kotlin.inject.anvil.runtime.optional)
 }
