@@ -16,7 +16,7 @@ kotlinInjectAnvil = "0.1.7"
 ktor = "3.5.1"
 ktorfit = "2.7.5"
 logback = "1.5.32"
-redacted = "1.15.1"
+redacted = "1.17.0"
 sqldelight = "2.3.2"
 
 [libraries]
