@@ -20,17 +20,17 @@ import com.vishnurajeevan.libroabs.models.libro.WishlistItemSyncStatus
 import dev.zacsweers.metro.Inject
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
 import io.ktor.http.Url
+import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readAvailable
+import io.ktor.utils.io.copyAndClose
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.io.RawSink
 import kotlinx.io.asSink
 import java.io.File
-import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
@@ -115,7 +115,7 @@ class LibroApiHandler(
       val match = filenameRegex.find(contentDisposition)
 
       val filename = match?.groupValues?.getOrNull(1)?.replace("+", " ")
-      downloadFile(url, File(targetDirectory, filename!!))
+      downloadFile(url, File(targetDirectory, filename!!),)
     }
   }
 
@@ -169,7 +169,7 @@ class LibroApiHandler(
       if (!dryRun) {
         downloadFile(
           url = Url(downloadUrl.pdf_url),
-          destinationFile = File(targetDirectory, pdfExtra.filename)
+          destinationFile = File(targetDirectory, pdfExtra.filename),
         )
       }
     }
@@ -210,23 +210,8 @@ class LibroApiHandler(
       ----
     """.trimIndent()
     )
-    val stream = destinationFile.outputStream().asSink()
     downloadClient.prepareGet(url).execute {
-      val channel: ByteReadChannel = it.body<ByteReadChannel>()
-      channel.readTo(stream)
-    }
-
-    val input = response.body<ByteReadChannel>()
-    FileOutputStream(destinationFile).use { output ->
-      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-
-      while (true) {
-        val bytesRead = input.readAvailable(buffer)
-        if (bytesRead == -1) break
-
-        output.write(buffer, 0, bytesRead)
-      }
-      output.flush()
+      it.body<ByteReadChannel>().copyAndClose(destinationFile.writeChannel())
     }
   }
 }
