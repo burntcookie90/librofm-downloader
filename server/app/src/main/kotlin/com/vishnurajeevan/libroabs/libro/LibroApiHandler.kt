@@ -21,12 +21,14 @@ import dev.zacsweers.metro.Inject
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.http.Url
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.io.asSink
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
@@ -200,7 +202,7 @@ class LibroApiHandler(
     libroAPI.fetchAudiobookDetails(token, isbn).data.audiobook
   }
 
-  private suspend fun downloadFile(url: Url, destinationFile: File) {
+  private suspend fun downloadFile(url: Url, destinationFile: File) = withContext(ioDispatcher) {
     lfdLogger.v(
       """
       ----
@@ -208,7 +210,11 @@ class LibroApiHandler(
       ----
     """.trimIndent()
     )
-    val response = downloadClient.get(url)
+    val stream = destinationFile.outputStream().asSink()
+    downloadClient.prepareGet(url).execute {
+      val channel: ByteReadChannel = it.body<ByteReadChannel>()
+      channel.readTo(stream)
+    }
 
     val input = response.body<ByteReadChannel>()
     FileOutputStream(destinationFile).use { output ->
