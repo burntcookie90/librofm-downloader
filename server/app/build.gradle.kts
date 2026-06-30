@@ -43,6 +43,7 @@ dependencies {
   implementation(libs.ktor.server.content.negotiation)
   implementation(libs.ktor.server.netty)
   implementation(libs.ktor.server.resources)
+  implementation(libs.ktor.utils)
   implementation(libs.ktorfit.lib)
   implementation(libs.ktorfit.response)
 
