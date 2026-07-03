@@ -1,12 +1,11 @@
 package com.vishnurajeevan.libroabs.models
 
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
-import me.tatarka.inject.annotations.Inject
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 interface Logger {
   fun v(msg: String)

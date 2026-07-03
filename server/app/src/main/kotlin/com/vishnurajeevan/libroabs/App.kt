@@ -29,17 +29,17 @@ import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.server.setupServer
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import me.tatarka.inject.annotations.Inject
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -100,7 +100,7 @@ class App(
     }
 
     setupServer(
-      onUpdate = { fullUpdate(it) },
+      onUpdate = { fullUpdate(overwrite = it) },
       serverInfo = serverInfo
     ).start(wait = true)
   }
@@ -228,10 +228,12 @@ class App(
         }
       }
       .filter {
-        if (!overwrite) {
-          !downloadHistoryRepo.isDownloaded(it.isbn)
-        } else {
+        if (overwrite) {
           true
+        } else {
+          val isDownloaded = downloadHistoryRepo.isDownloaded(it.isbn)
+          lfdLogger.v("Download history | ${it.isbn} is downloaded: $isDownloaded")
+          !isDownloaded
         }
       }
       .map { book ->

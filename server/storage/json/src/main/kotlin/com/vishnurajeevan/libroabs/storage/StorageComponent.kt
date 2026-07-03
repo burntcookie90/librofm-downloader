@@ -7,12 +7,12 @@ import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadHistory
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.serializer
-import me.tatarka.inject.annotations.Provides
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.ContributesTo
-import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
 
 @ContributesTo(AppScope::class)

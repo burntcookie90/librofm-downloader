@@ -15,13 +15,14 @@ import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.restrictTo
 import com.vishnurajeevan.libroabs.graph.AppComponent
-import com.vishnurajeevan.libroabs.graph.create
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
 import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
+import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 
 suspend fun main(args: Array<String>) = LibroDownloader().main(args)
 
@@ -137,7 +138,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       webhookUrls = webhookUrls
     )
 
-    val graph = AppComponent::class.create(serverInfo)
+    val graph = createGraphFactory<AppComponent.Factory>().create(serverInfo)
     graph.logger.i(serverInfo.prettyPrint())
 
     graph.storageMigrator.migrate()

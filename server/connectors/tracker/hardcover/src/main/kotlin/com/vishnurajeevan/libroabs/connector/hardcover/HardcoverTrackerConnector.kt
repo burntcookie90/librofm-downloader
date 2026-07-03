@@ -3,15 +3,7 @@ package com.vishnurajeevan.libroabs.connector.hardcover
 import com.apollographql.adapter.datetime.KotlinxLocalDateAdapter
 import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
-import com.vishnurajeevan.hardcover.AddBookMutation
-import com.vishnurajeevan.hardcover.BooksQuery
-import com.vishnurajeevan.hardcover.CreateEditionMutation
-import com.vishnurajeevan.hardcover.GetEditionByIsbnsQuery
-import com.vishnurajeevan.hardcover.MarkEditionAsOwnedMutation
-import com.vishnurajeevan.hardcover.MyIdQuery
-import com.vishnurajeevan.hardcover.MyOwnedQuery
-import com.vishnurajeevan.hardcover.MyReadQuery
-import com.vishnurajeevan.hardcover.MyWantToReadQuery
+import com.vishnurajeevan.hardcover.*
 import com.vishnurajeevan.hardcover.type.ContributionInputType
 import com.vishnurajeevan.hardcover.type.Date
 import com.vishnurajeevan.libroabs.connector.ConnectorAudioBookEdition
@@ -20,18 +12,15 @@ import com.vishnurajeevan.libroabs.connector.ConnectorContributor
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.models.graph.Io
 import com.vishnurajeevan.libroabs.models.graph.Named
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import me.tatarka.inject.annotations.Assisted
-import me.tatarka.inject.annotations.Inject
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import kotlinx.coroutines.*
 
-@Inject
-@ContributesBinding(AppScope::class)
+@AssistedInject
 class HardcoverTrackerConnector(
   @Assisted @Named("hardcover-token") token: String,
   @Assisted @Named("hardcover-endpoint") endpoint: String,
@@ -215,5 +204,13 @@ class HardcoverTrackerConnector(
           )
         }
       }
+  }
+
+  @AssistedFactory
+  interface Factory {
+    fun create(
+      @Named("hardcover-token") token: String,
+      @Named("hardcover-endpoint") endpoint: String,
+    ): HardcoverTrackerConnector
   }
 }

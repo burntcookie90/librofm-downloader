@@ -14,11 +14,11 @@ import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadHistory
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import me.tatarka.inject.annotations.Inject
-import software.amazon.lastmile.kotlin.inject.anvil.AppScope
-import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 import java.io.File
 
 @Inject

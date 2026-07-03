@@ -8,17 +8,12 @@ COPY gradle ./gradle
 
 # Ensure gradlew is executable
 RUN chmod +x gradlew
-
 RUN ./gradlew --version
 
-# Download dependencies first to leverage caching
-RUN --mount=type=cache,target=/root/.gradle ./gradlew dependencies --no-daemon --stacktrace
-
-# Copy source code after dependencies are cached
 COPY server ./server
 
 # Build the project efficiently
-RUN --mount=type=cache,target=/root/.gradle ./gradlew :server:app:installDist --no-daemon
+RUN ./gradlew :server:app:installDist
 
 # Use a minimal runtime image
 FROM eclipse-temurin:21-jre-alpine AS runtime
