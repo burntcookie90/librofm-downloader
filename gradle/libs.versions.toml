@@ -14,7 +14,7 @@ ktor = "3.5.1"
 ktorfit = "2.7.5"
 metro = "1.2.1"
 logback = "1.5.32"
-redacted = "1.17.0"
+redacted = "1.18.0"
 sqldelight = "2.3.2"
 
 jdk = "21"
