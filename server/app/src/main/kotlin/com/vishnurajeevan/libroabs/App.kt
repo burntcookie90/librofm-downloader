@@ -241,7 +241,7 @@ class App(
           processingSemaphore.withPermit {
             val targetDir = targetDir(book).also { it.mkdirs() }
             lfdLogger.v("Downloading ${book.title}")
-            when (serverInfo.format) {
+            val item = when (serverInfo.format) {
               BookFormat.MP3 -> {
                 downloadMp3sAndRename(book, targetDir)
                 LibroDownloadItem(
@@ -305,21 +305,24 @@ class App(
                 }
               }
             }
+            withContext(NonCancellable) {
+              dbWriter.write(
+                DownloadItem(
+                  isbn = item.isbn,
+                  format = item.format,
+                  path = item.path
+                )
+              )
+            }
+            item
           }
         }
       }
       .awaitAll()
-      .forEachIndexed { index, it ->
-        if (index == 0) {
+      .also { items ->
+        if (items.isNotEmpty()) {
           serverInfo.webhookUrls.forEach { webhookApi.postToWebhook(it) }
         }
-        dbWriter.write(
-          DownloadItem(
-            isbn = it.isbn,
-            format = it.format,
-            path = it.path
-          )
-        )
       }
 
     if (serverInfo.downloadExtras) {
@@ -347,22 +350,21 @@ class App(
                 data = book.audiobook_info.pdf_extras,
                 targetDirectory = targetDir
               )
-              DownloadPdfExtraItem(
+              val item = DownloadPdfExtraItem(
                 isbn = book.isbn
               )
+              withContext(NonCancellable) {
+                dbWriter.write(item)
+              }
+              item
             }
           }
         }
         .awaitAll()
-        .forEachIndexed { index, it ->
-          if (index == 0) {
+        .also { items ->
+          if (items.isNotEmpty()) {
             serverInfo.webhookUrls.forEach { webhookApi.postToWebhook(it) }
           }
-          dbWriter.write(
-            DownloadPdfExtraItem(
-              isbn = it.isbn
-            )
-          )
         }
     }
 
