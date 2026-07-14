@@ -25,8 +25,11 @@ After the initial download of your library, the container will run a API server.
 Bind a host port to `8080` to access the services.
 
 Endpoints:
-- GET: `/` opens a basic web interface showing the current config and a button to trigger an update
-- GET: `/update` allows you to manually force a refresh (ie: when you just purchased a book). Pass `?overwrite=true` to force download your library.
+- `GET`: `/` opens a basic web interface showing the current config and a button to trigger an update
+- `GET`: `/update` allows you to manually force a refresh (ie: when you just purchased a book). Pass `?overwrite=true` to force download your library.
+- `GET`: `/history` returns a json with your download history
+- `GET`: `/history/{isbn}` returns the single entry for an isbn
+- `DELETE`: `/history/{isbn}` deletes the history entry for an isbn
 
 
 ----

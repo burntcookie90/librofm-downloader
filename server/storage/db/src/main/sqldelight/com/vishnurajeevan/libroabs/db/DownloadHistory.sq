@@ -25,3 +25,13 @@ SELECT EXISTS (
 downloadCount:
 SELECT count(*)
 FROM download_history;
+
+selectIsbn:
+SELECT *
+FROM download_history
+WHERE isbn = ?;
+
+deleteIsbn:
+DELETE 
+FROM download_history
+WHERE isbn = ?;

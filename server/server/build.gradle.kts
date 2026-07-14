@@ -7,9 +7,11 @@ plugins {
 
 dependencies {
   implementation(project(":server:models"))
+  implementation(project(":server:storage:db"))
   implementation(libs.logback)
   implementation(libs.ktor.html)
   implementation(libs.ktor.serialization.kotlinx)
+  implementation(libs.ktor.server.call.logging)
   implementation(libs.ktor.server.core)
   implementation(libs.ktor.server.content.negotiation)
   implementation(libs.ktor.server.netty)

@@ -1,7 +1,10 @@
 package com.vishnurajeevan.libroabs.server
 
+import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.server.route.DownloadHistory
 import com.vishnurajeevan.libroabs.server.route.Info
+import com.vishnurajeevan.libroabs.server.route.RouteHandler
 import com.vishnurajeevan.libroabs.server.route.Update
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -11,13 +14,16 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.respondHtml
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.resources.Resources
+import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.head
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.html.InputType
 import kotlinx.html.body
@@ -30,11 +36,14 @@ import kotlinx.html.p
 import kotlinx.html.script
 import kotlinx.html.title
 import kotlinx.html.unsafe
-import kotlinx.serialization.json.Json
+import org.slf4j.event.Level
+import kotlin.reflect.KClass
 
+@Suppress("UNCHECKED_CAST")
 fun setupServer(
   onUpdate: suspend (overwrite: Boolean) -> Unit = {},
   serverInfo: ServerInfo,
+  routeHandlerMap: Map<KClass<*>, RouteHandler<*>>,
 ) : EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
   return embeddedServer(
     factory = Netty,
@@ -42,6 +51,13 @@ fun setupServer(
     host = "0.0.0.0",
     module = {
       install(Resources)
+      install(CallLogging) {
+        level = when (serverInfo.logLevel) {
+          ApplicationLogLevel.NONE -> Level.WARN
+          ApplicationLogLevel.INFO -> Level.INFO
+          ApplicationLogLevel.VERBOSE -> Level.DEBUG
+        }
+      }
       install(ContentNegotiation) {
         json()
       }
@@ -55,6 +71,17 @@ fun setupServer(
           val overwrite = it.overwrite ?: false
           call.respondText("Updating, overwrite: $overwrite!")
           onUpdate(overwrite)
+        }
+
+        get<DownloadHistory> {
+          (routeHandlerMap[DownloadHistory::class] as RouteHandler<DownloadHistory>).handle(route = it)
+        }
+
+        get<DownloadHistory.Isbn> {
+          (routeHandlerMap[DownloadHistory.Isbn::class] as RouteHandler<DownloadHistory.Isbn>).handle(route = it)
+        }
+        delete<DownloadHistory.Isbn> {
+          (routeHandlerMap[DownloadHistory.Isbn::class] as RouteHandler<DownloadHistory.Isbn>).handle(route = it)
         }
         head("/") {
           call.response.headers.append(

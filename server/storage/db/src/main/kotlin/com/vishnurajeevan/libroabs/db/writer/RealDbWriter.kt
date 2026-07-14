@@ -31,6 +31,7 @@ class RealDbWriter(
       is DownloadItem -> write.handle(downloadHistoryQueries)
       is TrackerWishlistSyncStatus -> write.handle(trackerWishlistSyncStatusQueries)
       is DownloadPdfExtraItem -> write.handle(pdfExtraDownloadHistoryQueries)
+      is DeleteDownloadHistoryItem -> write.handle(downloadHistoryQueries)
     }
   }
 }

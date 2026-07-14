@@ -27,6 +27,7 @@ import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.DownloadedFormat
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
+import com.vishnurajeevan.libroabs.server.route.RouteHandler
 import com.vishnurajeevan.libroabs.server.setupServer
 import com.vishnurajeevan.libroabs.storage.models.LibroDownloadItem
 import dev.zacsweers.metro.AppScope
@@ -41,6 +42,7 @@ import kotlinx.datetime.toLocalDateTime
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import kotlin.reflect.KClass
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -66,6 +68,7 @@ class App(
   private val targetDir: (Book) -> File,
   private val trackerWishlistSyncStatusRepo: TrackerWishlistSyncStatusRepo,
   private val webhookApi: WebhookApi,
+  private val routeHandlerMap: Map<KClass<*>, RouteHandler<*>>
 ) {
   @OptIn(ExperimentalTime::class)
 
@@ -101,7 +104,8 @@ class App(
 
     setupServer(
       onUpdate = { fullUpdate(overwrite = it) },
-      serverInfo = serverInfo
+      serverInfo = serverInfo,
+      routeHandlerMap = routeHandlerMap,
     ).start(wait = true)
   }
 
