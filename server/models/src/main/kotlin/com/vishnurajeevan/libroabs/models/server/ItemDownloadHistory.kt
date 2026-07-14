@@ -7,4 +7,5 @@ data class ItemDownloadHistory(
   val isbn: String,
   val format: DownloadedFormat,
   val path: String,
+  val hasPdfDownloaded: Boolean,
 )

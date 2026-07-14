@@ -43,22 +43,24 @@ class RealDownloadHistoryRepo(
   }
 
   override suspend fun downloadHistory(): List<ItemDownloadHistory> {
-    return downloadHistoryQueries.selectAll { isbn, path, format ->
+    return downloadHistoryQueries.selectAll { isbn, path, format, hasPdfDownloaded ->
       ItemDownloadHistory(
         isbn = isbn,
         format = format,
-        path = path
+        path = path,
+        hasPdfDownloaded = hasPdfDownloaded
       )
     }
       .executeAsList()
   }
 
   override suspend fun downloadHistory(isbn: String): ItemDownloadHistory {
-    return downloadHistoryQueries.selectIsbn(isbn) { isbn, path, format ->
+    return downloadHistoryQueries.selectIsbn(isbn) { isbn, path, format, hasPdfDownloaded ->
       ItemDownloadHistory(
         isbn = isbn,
         format = format,
-        path = path
+        path = path,
+        hasPdfDownloaded = hasPdfDownloaded
       )
     }.executeAsOne()
   }
