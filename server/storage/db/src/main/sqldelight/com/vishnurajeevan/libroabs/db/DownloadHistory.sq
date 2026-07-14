@@ -12,7 +12,15 @@ INSERT OR REPLACE INTO download_history
 VALUES ?;
 
 selectAll:
-SELECT *
+SELECT
+  download_history.isbn,
+  download_history.path,
+  download_history.format,
+  EXISTS (
+    SELECT 1
+    FROM pdf_extra_download_history
+    WHERE pdf_extra_download_history.isbn = download_history.isbn
+  ) AS hasPdfDownloaded
 FROM download_history;
 
 isDownloaded:
@@ -25,3 +33,21 @@ SELECT EXISTS (
 downloadCount:
 SELECT count(*)
 FROM download_history;
+
+selectIsbn:
+SELECT
+  download_history.isbn,
+  download_history.path,
+  download_history.format,
+  EXISTS (
+    SELECT 1
+    FROM pdf_extra_download_history
+    WHERE pdf_extra_download_history.isbn = download_history.isbn
+  ) AS hasPdfDownloaded
+FROM download_history
+WHERE download_history.isbn = ?;
+
+deleteIsbn:
+DELETE
+FROM download_history
+WHERE isbn = ?;

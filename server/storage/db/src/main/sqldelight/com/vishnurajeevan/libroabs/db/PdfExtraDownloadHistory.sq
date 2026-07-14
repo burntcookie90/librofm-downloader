@@ -12,3 +12,8 @@ SELECT EXISTS (
   FROM pdf_extra_download_history
   WHERE isbn =?
 );
+
+deleteIsbn:
+DELETE
+FROM pdf_extra_download_history
+WHERE isbn = ?;
