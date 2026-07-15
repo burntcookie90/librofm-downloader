@@ -21,9 +21,9 @@ import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
 import io.ktor.server.routing.head
-import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.html.InputType
 import kotlinx.html.body
@@ -62,27 +62,15 @@ fun setupServer(
         json()
       }
       routing {
-        get<Info> {
-          call.respond(
-            serverInfo
-          )
-        }
         get<Update> {
-          val overwrite = it.overwrite ?: false
-          call.respondText("Updating, overwrite: $overwrite!")
-          onUpdate(overwrite)
+          routeHandlerMap.handleRoute(it)
+          onUpdate(it.overwrite ?: false)
         }
 
-        get<DownloadHistory> {
-          (routeHandlerMap[DownloadHistory::class] as RouteHandler<DownloadHistory>).handle(route = it)
-        }
+        get<DownloadHistory> { routeHandlerMap.handleRoute(it) }
+        get<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
+        delete<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
 
-        get<DownloadHistory.Isbn> {
-          (routeHandlerMap[DownloadHistory.Isbn::class] as RouteHandler<DownloadHistory.Isbn>).handle(route = it)
-        }
-        delete<DownloadHistory.Isbn> {
-          (routeHandlerMap[DownloadHistory.Isbn::class] as RouteHandler<DownloadHistory.Isbn>).handle(route = it)
-        }
         head("/") {
           call.response.headers.append(
             "App-Hash",
@@ -133,4 +121,10 @@ fun setupServer(
       }
     }
   )
+}
+
+@Suppress("UNCHECKED_CAST")
+context(routingContext: RoutingContext)
+suspend inline fun <reified T: Any> Map<KClass<*>, RouteHandler<*>>.handleRoute(route: T) {
+  (getValue(T::class) as RouteHandler<T>).handle(route)
 }
