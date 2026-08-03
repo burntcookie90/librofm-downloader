@@ -1,0 +1,5 @@
+query Search($query: String!, $perPage: Int!) {
+  search(query: $query, query_type: "Book", per_page: $perPage) {
+    ids
+  }
+}

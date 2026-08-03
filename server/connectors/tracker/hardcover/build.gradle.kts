@@ -25,4 +25,6 @@ dependencies {
   api(project(":server:connectors:tracker:api"))
   implementation(libs.apollo.runtime)
   implementation(libs.apollo.adapters.kotlinx.datetime)
+
+  testImplementation(libs.kotlin.test.junit)
 }

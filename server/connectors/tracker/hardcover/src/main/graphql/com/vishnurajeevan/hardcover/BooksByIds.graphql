@@ -1,0 +1,13 @@
+query BooksByIds($ids: [Int!]!) {
+  books(where: {id: {_in: $ids}}) {
+    id
+    title
+    contributions {
+      id
+      author {
+        id
+        name
+      }
+    }
+  }
+}

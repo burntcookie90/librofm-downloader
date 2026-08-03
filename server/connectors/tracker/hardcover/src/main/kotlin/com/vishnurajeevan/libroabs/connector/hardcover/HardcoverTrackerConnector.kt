@@ -190,28 +190,58 @@ class HardcoverTrackerConnector(
       .execute()
   }
 
+  /**
+   * Finds a book via Hardcover's search endpoint, then verifies the candidate locally.
+   *
+   * This previously filtered the `books` table directly with `title: {_eq: $title}` joined through
+   * `contributions.author.name`. That is an ad-hoc query against their primary table for something
+   * they expose a purpose-built search index for, and exact equality meant it missed almost every
+   * real-world title variation — subtitles, punctuation, case, `&` vs `and`, author initials.
+   *
+   * Search does the recall work; [BookMatching] does the precision work. The verification step is not
+   * optional: search is fuzzy and ranked, and an unverified top hit would attach a Libro.fm audiobook
+   * edition to whatever book happened to rank first.
+   */
   override suspend fun searchByTitle(title: String, author: String): ConnectorBook? {
-    return apolloClient.query(BooksQuery(title, author))
+    val ids = apolloClient.query(SearchQuery(query = "$title $author", perPage = SEARCH_RESULT_LIMIT))
       .execute()
-      .data!!
-      .books
-      .firstNotNullOfOrNull {
-        it.title?.let { name ->
-          ConnectorBook(
-            id = it.id.toString(),
-            title = name,
-            contributions = it.contributions.mapNotNull { contribution ->
-              contribution.author?.name?.let { authorName ->
-                ConnectorContributor(
-                  contribution.author.id.toString(),
-                  authorName
-                )
-              }
-            },
-            connectorAudioBook = emptyList()
+      .data
+      ?.search
+      ?.ids
+      ?.filterNotNull()
+      .orEmpty()
+
+    if (ids.isEmpty()) return null
+
+    val candidates = apolloClient.query(BooksByIdsQuery(ids))
+      .execute()
+      .data
+      ?.books
+      .orEmpty()
+      // `books` does not preserve the ranking that search returned, so restore it before matching.
+      .sortedBy { ids.indexOf(it.id) }
+
+    val matched = BookMatching.bestMatch(
+      title = title,
+      author = author,
+      candidates = candidates,
+      titleOf = { it.title },
+      authorsOf = { book -> book.contributions.mapNotNull { it.author?.name } },
+    ) ?: return null
+
+    return ConnectorBook(
+      id = matched.id.toString(),
+      title = matched.title.orEmpty(),
+      contributions = matched.contributions.mapNotNull { contribution ->
+        contribution.author?.name?.let { authorName ->
+          ConnectorContributor(
+            contribution.author.id.toString(),
+            authorName
           )
         }
-      }
+      },
+      connectorAudioBook = emptyList()
+    )
   }
 
   @AssistedFactory
@@ -226,5 +256,8 @@ class HardcoverTrackerConnector(
     /** ~40 requests/min, comfortably under Hardcover's published limit. */
     val MIN_REQUEST_INTERVAL = 1500.milliseconds
     const val ISBN_LOOKUP_CHUNK_SIZE = 100
+
+    /** Enough ranked candidates to survive a near miss at the top, few enough to stay cheap. */
+    const val SEARCH_RESULT_LIMIT = 5
   }
 }

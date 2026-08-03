@@ -79,16 +79,23 @@ another pass over the whole library.
 optional shared secret and moving mutation to POST would close it properly, but both are breaking
 changes for anyone using the documented webhook, so that call belongs to the maintainer.
 
-### 7. Self-identifying User-Agent by default
+### 7. User-Agent: intentionally left as-is
 
-The image shipped `User-Agent=okhttp/5.3.2` alongside `X-LibroFm-AppVer`, making traffic
-indistinguishable from the official Android app in libro.fm's logs. The default is now
-`librofm-downloader (+https://github.com/burntcookie90/librofm-downloader)`.
+The image ships `User-Agent=okhttp/5.3.2` alongside `X-LibroFm-AppVer`, which makes this tool's
+traffic indistinguishable from the official Android app.
 
-`X-LibroFm-AppVer` is left in place because the v10 endpoints appear to require it, and the value
-stays overridable via `LIBRO_FM_HEADERS`. This is the one change here that is a policy decision
-rather than a straight improvement: it gives libro.fm the ability to see, rate-limit, or contact this
-client instead of having to guess. It also means they *can* block it, which is the point.
+An earlier revision of this branch changed that default to a self-identifying
+`librofm-downloader (+url)` string. **That was reverted, because libro.fm allowlists supported user
+agents and blocks everything else** — a self-identifying UA does not get rate-limited or flagged, it
+gets rejected outright, and the tool stops working for everyone.
+
+Worth recording plainly: the impersonation is not gratuitous, it is what the allowlist requires of any
+third-party client. There is no client-side change that makes this traffic honestly identifiable
+while keeping the tool functional. Fixing it properly requires libro.fm to allowlist an identifier
+for tools like this one, which is not something this repo can do unilaterally.
+
+The value stays overridable via `LIBRO_FM_HEADERS`, so if libro.fm ever publishes an accepted
+third-party identifier, it is a one-line env change rather than a rebuild.
 
 ### 8. Zip Slip containment
 
