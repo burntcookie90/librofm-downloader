@@ -2,6 +2,7 @@ query BooksByIds($ids: [Int!]!) {
   books(where: {id: {_in: $ids}}) {
     id
     title
+    alternative_titles
     contributions {
       id
       author {

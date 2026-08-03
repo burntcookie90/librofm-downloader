@@ -17,17 +17,37 @@ import java.text.Normalizer
  */
 internal object BookMatching {
 
-  /** Picks the first candidate that passes verification, preserving search's ranking. */
+  /**
+   * Picks the first candidate that passes verification, preserving search's ranking.
+   *
+   * [titlesOf] should yield the candidate's primary title *and* its alternative titles. Hardcover's
+   * `books` records are the English work, so a translated audiobook — "El nombre del viento" against
+   * "The Name of the Wind" — can only ever match through the alternative titles. Matching any one of
+   * them is enough, since the author check is what carries precision.
+   */
   fun <T> bestMatch(
     title: String,
     author: String,
     candidates: List<T>,
-    titleOf: (T) -> String?,
+    titlesOf: (T) -> List<String>,
     authorsOf: (T) -> List<String>,
   ): T? = candidates.firstOrNull { candidate ->
-    val candidateTitle = titleOf(candidate) ?: return@firstOrNull false
-    titleMatches(title, candidateTitle) && authorMatches(author, authorsOf(candidate))
+    titlesOf(candidate).any { titleMatches(title, it) } && authorMatches(author, authorsOf(candidate))
   }
+
+  /**
+   * `alternative_titles` is an untyped json column, so pull every string out of whatever shape it
+   * arrives in — a bare array, an array of objects keyed by language, a single string.
+   */
+  internal fun extractTitles(value: Any?, depth: Int = 0): List<String> = when {
+    depth > MAX_JSON_DEPTH -> emptyList()
+    value is String -> listOf(value)
+    value is List<*> -> value.flatMap { extractTitles(it, depth + 1) }
+    value is Map<*, *> -> value.values.flatMap { extractTitles(it, depth + 1) }
+    else -> emptyList()
+  }
+    .filter { it.isNotBlank() }
+    .distinct()
 
   /**
    * Titles match when they normalize to the same string, or when one is the other followed by a
@@ -73,6 +93,7 @@ internal object BookMatching {
     .trim()
     .replace(WHITESPACE, " ")
 
+  private const val MAX_JSON_DEPTH = 5
   private val DIACRITICS = "\\p{Mn}+".toRegex()
   private val NON_ALPHANUMERIC = "[^a-z0-9]+".toRegex()
   private val WHITESPACE = "\\s+".toRegex()

@@ -159,11 +159,11 @@ splits on the first only, trims, and gives a real error on a malformed entry.
   deleting history is what causes a re-download.
 - **Books that permanently fail to download** are never recorded, so they are retried in full on every
   cycle indefinitely. A failure count with backoff would bound this.
-- **Cross-language matching.** Because Hardcover's `books` records are English-only, a translated
-  audiobook never matches its work by title, so non-English libraries sync poorly. `books` exposes
-  `alternative_titles` and `subtitle`, which are the obvious way to close that gap. It was left out
-  here because `alternative_titles` is a `json` scalar needing an Apollo adapter, and because it
-  should land together with setting `language_id` on created editions — `BookDtoInput` supports it,
-  but libro.fm's `Book` model carries no language field to populate it from. Creating editions that
-  match cross-language *without* setting a language would put mislabelled rows in a shared database,
-  which is worse than not creating them. Today the title check is what prevents that.
+- **`language_id` on created editions.** Now that matching goes through `alternative_titles`, a
+  translated audiobook *can* match its English work — which means the tool will start creating
+  editions for non-English books. `BookDtoInput` accepts `language_id`, but libro.fm's `Book` model
+  carries no language field to populate it from, so those editions land without one. That is a real
+  gap: it is better than the previous behaviour of never matching them at all, but it does write rows
+  that are silent about their language. Worth checking whether libro.fm's API returns a language field
+  that simply is not modelled here — `ignoreUnknownKeys` is on, so one may already be arriving and
+  being discarded. If so, populating `language_id` is a small follow-up.

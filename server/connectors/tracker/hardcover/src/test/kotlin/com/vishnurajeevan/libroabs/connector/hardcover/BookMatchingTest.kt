@@ -8,14 +8,18 @@ import kotlin.test.assertTrue
 
 class BookMatchingTest {
 
-  private data class Book(val title: String?, val authors: List<String>)
+  private data class Book(
+    val title: String?,
+    val authors: List<String>,
+    val alternativeTitles: Any? = null,
+  )
 
   private fun match(title: String, author: String, vararg candidates: Book) =
     BookMatching.bestMatch(
       title = title,
       author = author,
       candidates = candidates.toList(),
-      titleOf = { it.title },
+      titlesOf = { listOfNotNull(it.title) + BookMatching.extractTitles(it.alternativeTitles) },
       authorsOf = { it.authors },
     )
 
@@ -118,5 +122,72 @@ class BookMatchingTest {
   fun `tolerates a null title on a candidate`() {
     val expected = Book("Circe", listOf("Madeline Miller"))
     assertEquals(expected, match("Circe", "Madeline Miller", Book(null, listOf("Madeline Miller")), expected))
+  }
+
+  // Cross-language matching. Hardcover's book records are the English work, so a translated
+  // audiobook can only ever match through alternative_titles.
+
+  @Test
+  fun `matches a translated title through alternative titles`() {
+    val work = Book(
+      title = "The Name of the Wind",
+      authors = listOf("Patrick Rothfuss"),
+      alternativeTitles = listOf("El nombre del viento", "Der Name des Windes"),
+    )
+    assertEquals(work, match("El nombre del viento", "Patrick Rothfuss", work))
+  }
+
+  @Test
+  fun `alternative titles still require the author to match`() {
+    val work = Book(
+      title = "The Name of the Wind",
+      authors = listOf("Patrick Rothfuss"),
+      alternativeTitles = listOf("El nombre del viento"),
+    )
+    assertNull(match("El nombre del viento", "Someone Else", work))
+  }
+
+  @Test
+  fun `alternative titles are normalized like primary titles`() {
+    val work = Book(
+      title = "Book",
+      authors = listOf("An Author"),
+      alternativeTitles = listOf("L'Étranger"),
+    )
+    assertEquals(work, match("L Etranger", "An Author", work))
+  }
+
+  // extractTitles has to survive whatever shape the json column arrives in.
+
+  @Test
+  fun `extractTitles reads a flat array`() {
+    assertEquals(listOf("one", "two"), BookMatching.extractTitles(listOf("one", "two")))
+  }
+
+  @Test
+  fun `extractTitles reads objects keyed by language`() {
+    assertEquals(
+      listOf("El nombre del viento"),
+      BookMatching.extractTitles(listOf(mapOf("es" to "El nombre del viento"))),
+    )
+  }
+
+  @Test
+  fun `extractTitles reads a bare string`() {
+    assertEquals(listOf("solo"), BookMatching.extractTitles("solo"))
+  }
+
+  @Test
+  fun `extractTitles drops blanks non-strings and duplicates`() {
+    assertEquals(
+      listOf("real"),
+      BookMatching.extractTitles(listOf("real", "  ", 42, null, "real")),
+    )
+  }
+
+  @Test
+  fun `extractTitles handles null and unexpected shapes`() {
+    assertEquals(emptyList(), BookMatching.extractTitles(null))
+    assertEquals(emptyList(), BookMatching.extractTitles(42))
   }
 }

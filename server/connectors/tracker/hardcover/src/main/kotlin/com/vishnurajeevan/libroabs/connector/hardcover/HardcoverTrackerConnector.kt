@@ -225,7 +225,9 @@ class HardcoverTrackerConnector(
       title = title,
       author = author,
       candidates = candidates,
-      titleOf = { it.title },
+      titlesOf = { book ->
+        listOfNotNull(book.title) + BookMatching.extractTitles(book.alternative_titles)
+      },
       authorsOf = { book -> book.contributions.mapNotNull { it.author?.name } },
     ) ?: return null
 
