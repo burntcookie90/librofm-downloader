@@ -234,13 +234,21 @@ class App(
    * Create tracker editions for libro ISBNs that the tracker does not know about yet, and return the
    * ISBN paired with each edition that was created.
    *
-   * Every ISBN considered here is recorded via [TrackerCreatedEdition] before its result is used, and
-   * ISBNs recorded on a previous run are skipped outright. That guard is the point of this function:
    * `insert_edition` writes into the tracker's *shared* book database, and the previous
    * implementation re-derived what to create purely from "does an ISBN lookup find it?". Any insert
    * that did not immediately become queryable by ISBN — held for moderation, silently rejected, a
    * locked book, an ISBN normalized differently on their side — produced a brand new duplicate
    * edition on every sync, forever, unattended.
+   *
+   * The guard against that distinguishes two outcomes, because they need opposite handling:
+   *
+   * - **We called `createEdition`.** A write may have landed regardless of what came back, so the
+   *   ISBN is recorded and never retried.
+   * - **Search found no match.** Nothing was written, so there is no duplicate to create. These are
+   *   retried after [UNMATCHED_RETRY_INTERVAL] rather than written off permanently — the tracker's
+   *   catalog grows, and a book it cannot match today may match later. Notably, a tracker whose book
+   *   records are English-only will never match a non-English audiobook, and those should not be
+   *   abandoned on the strength of one lookup.
    *
    * [resolveBook] is only invoked for ISBNs that survive the guard so that we do not spend a libro.fm
    * request per book on work we are going to discard.
@@ -250,14 +258,18 @@ class App(
     resolveBook: suspend (String) -> Book,
   ): List<Pair<String, ConnectorBook>> {
     if (isbns.isEmpty()) return emptyList()
-    val alreadyAttempted = trackerCreatedEditionRepo.getAttemptedIsbns().toSet()
+    val now = Clock.System.now()
+    val toSkip = trackerCreatedEditionRepo.getIsbnsToSkip(
+      unmatchedRetryCutoffEpochSeconds = (now - UNMATCHED_RETRY_INTERVAL).epochSeconds
+    )
 
-    val (toAttempt, skipped) = isbns.partition { it !in alreadyAttempted }
+    val (toAttempt, skipped) = isbns.partition { it !in toSkip }
     if (skipped.isNotEmpty()) {
-      lfdLogger.v("Skipping edition creation for ${skipped.size} ISBN(s) already attempted previously")
+      lfdLogger.v("Skipping edition creation for ${skipped.size} ISBN(s) handled on a previous run")
     }
 
     return toAttempt.mapNotNull { isbn ->
+      var writeAttempted = false
       val created = runCatching {
         val audiobook = resolveBook(isbn)
         val trackerBook = searchByTitle(audiobook.title, audiobook.authors.first())
@@ -265,6 +277,9 @@ class App(
           lfdLogger.v("No tracker match for ${audiobook.title} ($isbn), not creating an edition")
           null
         } else {
+          // Set before the call, not after, so a failure partway through is still treated as a
+          // possible write.
+          writeAttempted = true
           createEdition(
             trackerBook.copy(
               releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
@@ -284,10 +299,14 @@ class App(
         }
         .getOrNull()
 
-      // Recorded on every outcome, including failure. Retrying a failed insert on the next pulse is
-      // exactly the behaviour that produces duplicates on the tracker's side.
       withContext(NonCancellable) {
-        dbWriter.write(TrackerCreatedEdition(isbn = isbn, wasCreated = created != null))
+        dbWriter.write(
+          TrackerCreatedEdition(
+            isbn = isbn,
+            writeAttempted = writeAttempted,
+            attemptedAtEpochSeconds = now.epochSeconds
+          )
+        )
       }
 
       created?.let { isbn to it }
@@ -602,5 +621,14 @@ class App(
 
   private suspend fun HealthcheckApi.startMeasureWithToken() = withContext(ioDispatcher) {
     hcToken?.let { if (it.isNotEmpty()) start(it) }
+  }
+
+  private companion object {
+    /**
+     * How long to leave a book alone after the tracker had no match for it. Long enough that a large
+     * unmatched library is not re-searched on every pulse, short enough that catalog additions get
+     * picked up.
+     */
+    val UNMATCHED_RETRY_INTERVAL = 30.days
   }
 }

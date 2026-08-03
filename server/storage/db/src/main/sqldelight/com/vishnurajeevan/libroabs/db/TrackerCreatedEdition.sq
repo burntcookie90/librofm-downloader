@@ -2,13 +2,24 @@ import kotlin.Boolean;
 
 CREATE TABLE tracker_created_edition (
   isbn TEXT PRIMARY KEY NOT NULL,
-  was_created INTEGER AS Boolean NOT NULL
+  write_attempted INTEGER AS Boolean NOT NULL,
+  attempted_at_epoch_seconds INTEGER NOT NULL
 );
 
 insertCreatedEdition:
 INSERT OR REPLACE INTO tracker_created_edition
 VALUES ?;
 
-getIsbns:
+-- Never retry: a write reached the tracker, so retrying risks a duplicate edition.
+getWriteAttemptedIsbns:
 SELECT isbn
-FROM tracker_created_edition;
+FROM tracker_created_edition
+WHERE write_attempted = 1;
+
+-- No match was found, so nothing was written and there is no duplicate to create. Safe to retry
+-- eventually — the tracker's catalog changes — but not on every pulse.
+getRecentlyUnmatchedIsbns:
+SELECT isbn
+FROM tracker_created_edition
+WHERE write_attempted = 0
+AND attempted_at_epoch_seconds > ?;

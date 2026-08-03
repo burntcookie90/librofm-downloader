@@ -25,14 +25,24 @@ moderation, silently rejected, a locked book, an ISBN normalized differently on 
 caused **a fresh duplicate edition to be written on every sync, forever, unattended**. With
 `SYNC_INTERVAL=h` that is hourly, per affected book, per user running the container.
 
-Both paths now share `App.createMissingEditions()`, which:
+Both paths now share `App.createMissingEditions()`, which records every ISBN it considers in a new
+`tracker_created_edition` table (migration `3.sqm`) and distinguishes two outcomes that need opposite
+handling:
 
-- skips any ISBN it has attempted before, successfully or not;
-- records the attempt in a new `tracker_created_edition` table (migration `3.sqm`) on every outcome,
-  including failure, so a failed insert is not retried on the next pulse;
-- catches and logs failures per book rather than aborting the whole sync;
-- resolves book details from libro.fm only for ISBNs that pass the guard, so the guard saves
-  libro.fm requests too.
+- **`createEdition` was called.** A write may have landed whatever came back, including on a failure
+  partway through, so the ISBN is recorded as written and never retried. This is the duplicate-
+  generating path and the reason the guard exists.
+- **Search found no match.** Nothing was written, so there is no duplicate to create. Permanently
+  writing the book off would be wrong — the tracker's catalog grows over time — so these are retried
+  after a 30 day cooldown rather than abandoned after one lookup.
+
+That distinction matters more than it first appears. Hardcover's `books` records are English-only
+(language lives on `editions`, not `books`), so a non-English audiobook will not match on title and
+falls into the second bucket permanently, not the first. Treating "no match" as final would silently
+write off every non-English book in a library forever, on the strength of a single lookup.
+
+It also catches and logs failures per book rather than aborting the whole sync, and only resolves
+book details from libro.fm for ISBNs that pass the guard, so the guard saves libro.fm requests too.
 
 It also fixes a related gap: `SKIP_TRACKING_ISBNS` was only applied to the "mark owned" path, so an
 ISBN the user explicitly excluded could still have an edition created for it on Hardcover. It is now
@@ -149,3 +159,11 @@ splits on the first only, trims, and gives a real error on a malformed entry.
   deleting history is what causes a re-download.
 - **Books that permanently fail to download** are never recorded, so they are retried in full on every
   cycle indefinitely. A failure count with backoff would bound this.
+- **Cross-language matching.** Because Hardcover's `books` records are English-only, a translated
+  audiobook never matches its work by title, so non-English libraries sync poorly. `books` exposes
+  `alternative_titles` and `subtitle`, which are the obvious way to close that gap. It was left out
+  here because `alternative_titles` is a `json` scalar needing an Apollo adapter, and because it
+  should land together with setting `language_id` on created editions — `BookDtoInput` supports it,
+  but libro.fm's `Book` model carries no language field to populate it from. Creating editions that
+  match cross-language *without* setting a language would put mislabelled rows in a shared database,
+  which is worse than not creating them. Today the title check is what prevents that.

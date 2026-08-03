@@ -10,8 +10,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 interface TrackerCreatedEditionRepo {
-  /** ISBNs we have already attempted to create an edition for, successful or not. */
-  suspend fun getAttemptedIsbns(): List<String>
+  /**
+   * ISBNs that should not be considered for edition creation right now: everything we have already
+   * written to the tracker, plus anything we failed to match more recently than
+   * [unmatchedRetryCutoffEpochSeconds].
+   */
+  suspend fun getIsbnsToSkip(unmatchedRetryCutoffEpochSeconds: Long): Set<String>
 }
 
 @Inject
@@ -22,7 +26,12 @@ class RealTrackerCreatedEditionRepo(
   @Io private val ioDispatcher: CoroutineDispatcher,
 ) : TrackerCreatedEditionRepo {
 
-  override suspend fun getAttemptedIsbns(): List<String> = withContext(ioDispatcher) {
-    queries.getIsbns().executeAsList()
+  override suspend fun getIsbnsToSkip(
+    unmatchedRetryCutoffEpochSeconds: Long
+  ): Set<String> = withContext(ioDispatcher) {
+    buildSet {
+      addAll(queries.getWriteAttemptedIsbns().executeAsList())
+      addAll(queries.getRecentlyUnmatchedIsbns(unmatchedRetryCutoffEpochSeconds).executeAsList())
+    }
   }
 }

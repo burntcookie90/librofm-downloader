@@ -1,4 +1,5 @@
 CREATE TABLE tracker_created_edition (
   isbn TEXT PRIMARY KEY NOT NULL,
-  was_created INTEGER NOT NULL
+  write_attempted INTEGER NOT NULL,
+  attempted_at_epoch_seconds INTEGER NOT NULL
 );
