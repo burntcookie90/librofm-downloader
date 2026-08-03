@@ -109,13 +109,19 @@ class LibroApiHandler(
     if (!dryRun) {
       lfdLogger.v("Downloading M4B: $m4bUrl")
       val url = Url(m4bUrl)
-      val contentDisposition = url.parameters["response-content-disposition"]!!
+      val contentDisposition = url.parameters["response-content-disposition"]
+        ?: error("M4B url is missing a response-content-disposition parameter")
 
       val filenameRegex = "filename=\"?([^\"]+)\"?".toRegex()
       val match = filenameRegex.find(contentDisposition)
 
       val filename = match?.groupValues?.getOrNull(1)?.replace("+", " ")
-      downloadFile(url, File(targetDirectory, filename!!),)
+        ?: error("Could not read a filename out of: $contentDisposition")
+
+      // Keep only the final path segment so a filename carrying `../` cannot escape the target
+      // directory, and replace the previous `!!`s, which crashed the download on any unexpected
+      // url shape.
+      downloadFile(url, File(targetDirectory, File(filename).name))
     }
   }
 
@@ -127,10 +133,19 @@ class LibroApiHandler(
         val destinationFile = File(targetDirectory, "part-$index.zip")
         downloadFile(Url(url), destinationFile)
 
+        val targetRoot = targetDirectory.toPath().toAbsolutePath().normalize()
         ZipInputStream(destinationFile.inputStream()).use { zipIn ->
           var entry = zipIn.nextEntry
           while (entry != null) {
-            val entryPath = targetDirectory.toPath() / entry.name
+            val entryName = entry.name
+            val entryPath = (targetRoot / entryName).normalize()
+
+            // Zip Slip: an archive entry named `../../…` would otherwise be written outside the
+            // media directory. These archives come from libro.fm over TLS so this is defence in
+            // depth, but an archive is untrusted input and cheap to validate.
+            require(entryPath.startsWith(targetRoot)) {
+              "Refusing zip entry outside of the target directory: $entryName"
+            }
 
             if (entry.isDirectory) {
               // Create directory

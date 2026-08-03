@@ -38,6 +38,10 @@ interface NetworkComponent {
         ApplicationLogLevel.INFO -> LogLevel.INFO
         ApplicationLogLevel.VERBOSE -> LogLevel.HEADERS
       }
+      // VERBOSE logs request headers, and ktor does not redact Authorization by default. Without
+      // this, the libro.fm bearer token is printed into container logs that people routinely paste
+      // into bug reports.
+      sanitizeHeader { it.equals(HttpHeaders.Authorization, ignoreCase = true) }
     }
   }
 

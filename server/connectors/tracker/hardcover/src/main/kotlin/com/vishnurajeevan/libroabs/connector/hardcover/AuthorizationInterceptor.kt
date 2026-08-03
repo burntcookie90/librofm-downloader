@@ -10,13 +10,9 @@ internal class AuthorizationInterceptor(
 ) : HttpInterceptor {
 
   override suspend fun intercept(request: HttpRequest, chain: HttpInterceptorChain): HttpResponse {
-    val newRequest = request.newBuilder().addHeader("Authorization", "Bearer $token").build()
-    val response = chain.proceed(newRequest)
-
-    return if (response.statusCode == 401) {
-      chain.proceed(newRequest)
-    } else {
-      response
-    }
+    // A 401 was previously retried once, immediately, with the same token and no backoff. That retry
+    // could never succeed — it only doubled every failing request against Hardcover for a token that
+    // was already known bad. Surface the 401 to the caller instead.
+    return chain.proceed(request.newBuilder().addHeader("Authorization", "Bearer $token").build())
   }
 }

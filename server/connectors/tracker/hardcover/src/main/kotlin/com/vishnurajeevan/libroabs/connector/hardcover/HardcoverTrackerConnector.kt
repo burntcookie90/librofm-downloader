@@ -19,6 +19,7 @@ import dev.zacsweers.metro.AssistedInject
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.*
+import kotlin.time.Duration.Companion.milliseconds
 
 @AssistedInject
 class HardcoverTrackerConnector(
@@ -30,6 +31,7 @@ class HardcoverTrackerConnector(
 
   private val apolloClient: ApolloClient = ApolloClient.Builder()
     .serverUrl(endpoint)
+    .addHttpInterceptor(RateLimitInterceptor(minInterval = MIN_REQUEST_INTERVAL, logger = logger))
     .addHttpInterceptor(AuthorizationInterceptor(token))
     .addInterceptor(LoggingInterceptor(logger))
     .addCustomScalarAdapter(
@@ -114,24 +116,30 @@ class HardcoverTrackerConnector(
       } ?: emptyList()
   }
 
+  /**
+   * Looks editions up in batches rather than passing an entire library into a single `_in` filter.
+   * A 2000 book library previously produced a 2000 element `_in` on their side, twice per sync.
+   */
   override suspend fun getEditions(isbn13s: List<String>): List<ConnectorBook> {
-    return apolloClient.query(
-      query = GetEditionByIsbnsQuery(isbn13s)
-    ).execute()
-      .data
-      ?.books
-      ?.map { book ->
-        ConnectorBook(
-          id = book.id.toString(),
-          title = book.title!!,
-          connectorAudioBook = book.editions.map { edition ->
-            ConnectorAudioBookEdition(
-              id = edition.id.toString(),
-              isbn13 = edition.isbn_13
-            )
-          }
-        )
-      } ?: emptyList()
+    return isbn13s.chunked(ISBN_LOOKUP_CHUNK_SIZE).flatMap { chunk ->
+      apolloClient.query(
+        query = GetEditionByIsbnsQuery(chunk)
+      ).execute()
+        .data
+        ?.books
+        ?.map { book ->
+          ConnectorBook(
+            id = book.id.toString(),
+            title = book.title!!,
+            connectorAudioBook = book.editions.map { edition ->
+              ConnectorAudioBookEdition(
+                id = edition.id.toString(),
+                isbn13 = edition.isbn_13
+              )
+            }
+          )
+        } ?: emptyList()
+    }
   }
 
   override suspend fun createEdition(book: ConnectorBook): ConnectorBook? {
@@ -212,5 +220,11 @@ class HardcoverTrackerConnector(
       @Named("hardcover-token") token: String,
       @Named("hardcover-endpoint") endpoint: String,
     ): HardcoverTrackerConnector
+  }
+
+  private companion object {
+    /** ~40 requests/min, comfortably under Hardcover's published limit. */
+    val MIN_REQUEST_INTERVAL = 1500.milliseconds
+    const val ISBN_LOOKUP_CHUNK_SIZE = 100
   }
 }

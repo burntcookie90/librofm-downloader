@@ -6,10 +6,12 @@ import com.vishnurajeevan.libroabs.connector.ConnectorBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.converter.ffmpeg.FfmpegClient
 import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
+import com.vishnurajeevan.libroabs.db.repo.TrackerCreatedEditionRepo
 import com.vishnurajeevan.libroabs.db.repo.TrackerWishlistSyncStatusRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
 import com.vishnurajeevan.libroabs.db.writer.DownloadItem
 import com.vishnurajeevan.libroabs.db.writer.DownloadPdfExtraItem
+import com.vishnurajeevan.libroabs.db.writer.TrackerCreatedEdition
 import com.vishnurajeevan.libroabs.db.writer.TrackerWishlistSyncStatus
 import com.vishnurajeevan.libroabs.healthcheck.HealthcheckApi
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
@@ -35,6 +37,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.TimeZone
@@ -67,6 +70,7 @@ class App(
   private val dbWriter: DbWriter,
   private val targetDir: (Book) -> File,
   private val trackerWishlistSyncStatusRepo: TrackerWishlistSyncStatusRepo,
+  private val trackerCreatedEditionRepo: TrackerCreatedEditionRepo,
   private val webhookApi: WebhookApi,
   private val routeHandlerMap: Map<KClass<*>, RouteHandler<*>>
 ) {
@@ -109,9 +113,35 @@ class App(
     ).start(wait = true)
   }
 
+  /**
+   * Guards against overlapping library syncs.
+   *
+   * `/update` is an unauthenticated GET, so anything that can reach the port — including a page the
+   * user happens to be visiting, via a plain `<img src>` — can trigger a sync, and `?overwrite=true`
+   * re-downloads the *entire* library. With no guard, repeated calls stacked concurrent full syncs
+   * on top of each other and multiplied the load we put on libro.fm. Concurrent requests now no-op
+   * instead of queueing up another pass.
+   */
+  private val updateInFlight = Mutex()
+
   private suspend fun fullUpdate(
     delayForInitial: Boolean = false,
     overwrite: Boolean = false
+  ) {
+    if (!updateInFlight.tryLock()) {
+      lfdLogger.i("An update is already running, ignoring this request")
+      return
+    }
+    try {
+      runFullUpdate(delayForInitial, overwrite)
+    } finally {
+      updateInFlight.unlock()
+    }
+  }
+
+  private suspend fun runFullUpdate(
+    delayForInitial: Boolean,
+    overwrite: Boolean
   ) {
     val delay = if (delayForInitial || overwrite) 1.minutes else 0.minutes
     healthCheckClient.startMeasureWithToken()
@@ -188,14 +218,55 @@ class App(
       }
 
     val editionsNotFound = isbnsToSync.minus(editions.map { it.connectorAudioBook.mapNotNull { it.isbn13 } }.flatten())
-    libroWishlist.audiobooks
-      .filter { it.isbn in editionsNotFound }
-      .map { libroClient.fetchBookDetails(it.isbn) }
-      .map { it to trackerConnector?.searchByTitle(it.title, it.authors.first()) }
-      .mapNotNull { (audiobook, trackerBook) ->
-        trackerBook?.let {
-          trackerConnector?.createEdition(
-            it.copy(
+    createMissingEditions(editionsNotFound) { libroClient.fetchBookDetails(it) }
+      .forEach { (isbn, created) ->
+        markWanted(created)
+        dbWriter.write(
+          TrackerWishlistSyncStatus(
+            isbn = isbn,
+            status = WishlistItemSyncStatus.SUCCESS
+          )
+        )
+      }
+  }
+
+  /**
+   * Create tracker editions for libro ISBNs that the tracker does not know about yet, and return the
+   * ISBN paired with each edition that was created.
+   *
+   * Every ISBN considered here is recorded via [TrackerCreatedEdition] before its result is used, and
+   * ISBNs recorded on a previous run are skipped outright. That guard is the point of this function:
+   * `insert_edition` writes into the tracker's *shared* book database, and the previous
+   * implementation re-derived what to create purely from "does an ISBN lookup find it?". Any insert
+   * that did not immediately become queryable by ISBN — held for moderation, silently rejected, a
+   * locked book, an ISBN normalized differently on their side — produced a brand new duplicate
+   * edition on every sync, forever, unattended.
+   *
+   * [resolveBook] is only invoked for ISBNs that survive the guard so that we do not spend a libro.fm
+   * request per book on work we are going to discard.
+   */
+  private suspend fun TrackerConnector.createMissingEditions(
+    isbns: List<String>,
+    resolveBook: suspend (String) -> Book,
+  ): List<Pair<String, ConnectorBook>> {
+    if (isbns.isEmpty()) return emptyList()
+    val alreadyAttempted = trackerCreatedEditionRepo.getAttemptedIsbns().toSet()
+
+    val (toAttempt, skipped) = isbns.partition { it !in alreadyAttempted }
+    if (skipped.isNotEmpty()) {
+      lfdLogger.v("Skipping edition creation for ${skipped.size} ISBN(s) already attempted previously")
+    }
+
+    return toAttempt.mapNotNull { isbn ->
+      val created = runCatching {
+        val audiobook = resolveBook(isbn)
+        val trackerBook = searchByTitle(audiobook.title, audiobook.authors.first())
+        if (trackerBook == null) {
+          lfdLogger.v("No tracker match for ${audiobook.title} ($isbn), not creating an edition")
+          null
+        } else {
+          createEdition(
+            trackerBook.copy(
               releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
               connectorAudioBook = listOf(
                 ConnectorAudioBookEdition(
@@ -207,17 +278,20 @@ class App(
           )
         }
       }
-      .forEach {
-        trackerConnector?.markWanted(it)
-        it.connectorAudioBook.firstOrNull()?.isbn13?.let { isbn ->
-          dbWriter.write(
-            TrackerWishlistSyncStatus(
-              isbn = isbn,
-              status = WishlistItemSyncStatus.SUCCESS
-            )
-          )
+        .onFailure {
+          if (it is CancellationException) throw it
+          lfdLogger.i("Edition creation failed for $isbn: ${it.message}")
         }
+        .getOrNull()
+
+      // Recorded on every outcome, including failure. Retrying a failed insert on the next pulse is
+      // exactly the behaviour that produces duplicates on the tracker's side.
+      withContext(NonCancellable) {
+        dbWriter.write(TrackerCreatedEdition(isbn = isbn, wasCreated = created != null))
       }
+
+      created?.let { isbn to it }
+    }
   }
 
   private suspend fun processLibrary(overwrite: Boolean = false) {
@@ -400,25 +474,13 @@ class App(
       .forEach {
         trackerConnector?.markOwned(it)
       }
-    localLibrary.audiobooks
-      .filter { it.isbn in editionsNotFound }
-      .map { it to trackerConnector?.searchByTitle(it.title, it.authors.first()) }
-      .mapNotNull { (audiobook, trackerBook) ->
-        trackerBook?.let {
-          trackerConnector?.createEdition(
-            it.copy(
-              releaseDate = audiobook.publication_date.toLocalDateTime(TimeZone.UTC).date,
-              connectorAudioBook = listOf(
-                ConnectorAudioBookEdition(
-                  id = "",
-                  isbn13 = audiobook.isbn
-                )
-              )
-            )
-          )
-        }
+
+    val booksByIsbn = localLibrary.audiobooks.associateBy { it.isbn }
+    trackerConnector
+      ?.createMissingEditions(editionsNotFound.filterNot { it in serverInfo.skipTrackingIsbns }) {
+        booksByIsbn.getValue(it)
       }
-      .forEach { trackerConnector?.markOwned(it) }
+      ?.forEach { (_, created) -> trackerConnector.markOwned(created) }
   }
 
   private suspend fun downloadMp3sAndRename(book: Book, targetDir: File) {

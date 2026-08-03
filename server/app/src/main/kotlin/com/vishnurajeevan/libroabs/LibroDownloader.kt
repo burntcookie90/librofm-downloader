@@ -110,8 +110,10 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       libroUserName = libroFmUsername,
       libroPassword = libroFmPassword,
       libroFmHeaders = libroFmHeaders.associate {
-        val split = it.split("=")
-        split[0] to split[1]
+        // limit = 2 so that a header value containing '=' survives round tripping
+        val split = it.split("=", limit = 2)
+        require(split.size == 2) { "Malformed entry in LIBRO_FM_HEADERS, expected 'Name=Value': $it" }
+        split[0].trim() to split[1].trim()
       },
       port = port,
       dataDir = dataDir,
@@ -134,7 +136,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       ffprobePath = ffprobePath,
       audioQuality = audioQuality,
       skipTrackingIsbns = skipTrackingIsbns,
-      hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
+      // Falls back to the documented default rather than ALL, which the README itself warns can
+      // cause double syncs.
+      hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.LIBRO_OWNED_TO_HARDCOVER,
       webhookUrls = webhookUrls
     )
 

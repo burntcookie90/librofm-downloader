@@ -1,0 +1,14 @@
+import kotlin.Boolean;
+
+CREATE TABLE tracker_created_edition (
+  isbn TEXT PRIMARY KEY NOT NULL,
+  was_created INTEGER AS Boolean NOT NULL
+);
+
+insertCreatedEdition:
+INSERT OR REPLACE INTO tracker_created_edition
+VALUES ?;
+
+getIsbns:
+SELECT isbn
+FROM tracker_created_edition;

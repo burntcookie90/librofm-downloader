@@ -42,7 +42,7 @@ ENV \
     PATH_PATTERN="FIRST_AUTHOR/BOOK_TITLE" \
     HEALTHCHECK_ID="" \
     HEALTHCHECK_HOST="https://hc-ping.com" \
-    LIBRO_FM_HEADERS="X-LibroFm-AppVer=7.34.8,User-Agent=okhttp/5.3.2" \
+    LIBRO_FM_HEADERS="X-LibroFm-AppVer=7.34.8,User-Agent=librofm-downloader (+https://github.com/burntcookie90/librofm-downloader)" \
     HARDCOVER_TOKEN=""
 
 WORKDIR /app

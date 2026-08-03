@@ -1,6 +1,7 @@
 package com.vishnurajeevan.libroabs.server.route
 
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.models.server.toPublicServerInfo
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesBinding
@@ -19,6 +20,6 @@ class Info
 class InfoRouteHandler(private val serverInfo: ServerInfo): RouteHandler<Info> {
   context(routingContext: RoutingContext)
   override suspend fun handle(route: Info) {
-    routingContext.call.respond(serverInfo)
+    routingContext.call.respond(serverInfo.toPublicServerInfo())
   }
 }

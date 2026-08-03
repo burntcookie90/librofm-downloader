@@ -37,5 +37,9 @@ interface DatabaseComponent {
 
   @SingleIn(AppScope::class)
   @Provides
+  fun trackerCreatedEditionQueries(db: Database): TrackerCreatedEditionQueries = db.trackerCreatedEditionQueries
+
+  @SingleIn(AppScope::class)
+  @Provides
   fun pdfExtrasQueries(db: Database): PdfExtraDownloadHistoryQueries = db.pdfExtraDownloadHistoryQueries
 }

@@ -2,6 +2,7 @@ package com.vishnurajeevan.libroabs.db.writer
 
 import com.vishnurajeevan.libroabs.db.DownloadHistoryQueries
 import com.vishnurajeevan.libroabs.db.PdfExtraDownloadHistoryQueries
+import com.vishnurajeevan.libroabs.db.TrackerCreatedEditionQueries
 import com.vishnurajeevan.libroabs.db.TrackerWishlistSyncStatusQueries
 import com.vishnurajeevan.libroabs.db.WishlistSyncStatusQueries
 import com.vishnurajeevan.libroabs.models.Logger
@@ -20,6 +21,7 @@ class RealDbWriter(
   private val downloadHistoryQueries: DownloadHistoryQueries,
   private val wishlistSyncStatusQueries: WishlistSyncStatusQueries,
   private val trackerWishlistSyncStatusQueries: TrackerWishlistSyncStatusQueries,
+  private val trackerCreatedEditionQueries: TrackerCreatedEditionQueries,
   private val pdfExtraDownloadHistoryQueries: PdfExtraDownloadHistoryQueries,
   @Io private val ioDispatcher: CoroutineDispatcher,
   private val logger: Logger,
@@ -30,6 +32,7 @@ class RealDbWriter(
       is LibroFmWishlistSyncStatus -> write.handle(wishlistSyncStatusQueries)
       is DownloadItem -> write.handle(downloadHistoryQueries)
       is TrackerWishlistSyncStatus -> write.handle(trackerWishlistSyncStatusQueries)
+      is TrackerCreatedEdition -> write.handle(trackerCreatedEditionQueries)
       is DownloadPdfExtraItem -> write.handle(pdfExtraDownloadHistoryQueries)
       is DeleteDownloadHistoryItem -> write.handle(downloadHistoryQueries, pdfExtraDownloadHistoryQueries)
     }
