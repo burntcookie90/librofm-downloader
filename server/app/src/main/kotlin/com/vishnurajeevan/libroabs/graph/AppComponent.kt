@@ -3,6 +3,7 @@ package com.vishnurajeevan.libroabs.graph
 import com.vishnurajeevan.libroabs.App
 import com.vishnurajeevan.libroabs.StorageMigrator
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
+import com.vishnurajeevan.libroabs.libro.sanitizeForFilename
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
@@ -71,7 +72,8 @@ interface AppComponent {
   @Provides
   @SingleIn(AppScope::class)
   fun providesTargetDir(lfdLogger: Logger): (Book) -> File = { book ->
-    File("${serverInfo.mediaDir}/${book.createPath(serverInfo.pathPattern)}")
+    val relativePath = book.createPath(serverInfo.pathPattern) { it.sanitizeForFilename() }
+    File("${serverInfo.mediaDir}/$relativePath")
       .also {
         lfdLogger.v("Target Directory: $it")
       }

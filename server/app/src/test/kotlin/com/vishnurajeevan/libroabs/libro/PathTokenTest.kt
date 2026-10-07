@@ -3,6 +3,7 @@ package com.vishnurajeevan.libroabs.libro
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.BookInfo
 import com.vishnurajeevan.libroabs.models.libro.Genre
+import com.vishnurajeevan.libroabs.libro.sanitizeForFilename
 import com.vishnurajeevan.libroabs.models.server.createPath
 import kotlinx.datetime.Instant
 import java.io.File
@@ -64,6 +65,24 @@ class PathTokenTest {
     series_num = 2
   )
 
+  private val bookWithInvalidTitleCharacters = Book(
+    title = "The, Great: Novel/Part?",
+    authors = listOf("Jane Doe"),
+    isbn = "1234567890",
+    cover_url = "http://example.com/cover.jpg",
+    audiobook_info = BookInfo(
+      narrators = listOf("John Smith"),
+      duration = 3600,
+      track_count = 12
+    ),
+    publisher = "Test Publisher",
+    publication_date = Instant.parse("2024-03-19T00:00:00.000Z"),
+    description = "A great novel",
+    genres = listOf(Genre("Fiction")),
+    series = "Amazing Series",
+    series_num = 1
+  )
+
   @Test
   fun testAuthorFirstBookTitle() {
     val pathPattern = "FIRST_AUTHOR/BOOK_TITLE"
@@ -113,6 +132,18 @@ class PathTokenTest {
     val pathPattern = "ALL_AUTHORS/BOOK_TITLE"
     val expected = "John Doe, Jane Smith, Alex Johnson/Collaborative Work"
     assertEquals(expected, File(multipleAuthorsBook.createPath(pathPattern)).path)
+  }
+
+  @Test
+  fun testCreatePathSanitizesUserPathPattern() {
+    val pathPattern = "FIRST_AUTHOR/SERIES_NAME/SERIES_NUM - BOOK_TITLE (PUBLICATION_YEAR) [ISBN]"
+    val expected = "Jane Doe/Amazing Series/1 - The, Great NovelPart (2024) [1234567890]"
+    assertEquals(
+      expected,
+      File(
+        bookWithInvalidTitleCharacters.createPath(pathPattern) { it.sanitizeForFilename() }
+      ).path
+    )
   }
 
   @Test
