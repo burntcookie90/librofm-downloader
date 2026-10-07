@@ -9,6 +9,7 @@ import com.vishnurajeevan.libroabs.storage.models.LibroDownloadHistory
 import com.vishnurajeevan.libroabs.storage.models.WishlistSyncHistory
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,7 +23,8 @@ interface StorageComponent {
   fun downloadHistory(
     serverInfo: ServerInfo,
     logger: Logger,
-    @Io dispatcher: CoroutineDispatcher
+    @Io dispatcher: CoroutineDispatcher,
+    @Named("dryRun") dryRun: Boolean
   ): Storage<LibroDownloadHistory> =
     RealStorage.Factory<LibroDownloadHistory>()
       .create(
@@ -30,48 +32,55 @@ interface StorageComponent {
         initial = LibroDownloadHistory(),
         serializer = serializer(),
         dispatcher = dispatcher,
-        logger = logger
+        logger = logger,
+        dryRun = dryRun
       )
 
   @Provides
   fun authToken(
     serverInfo: ServerInfo,
     lfdLogger: Logger,
-    @Io dispatcher: CoroutineDispatcher
+    @Io dispatcher: CoroutineDispatcher,
+    @Named("dryRun") dryRun: Boolean
   ): Storage<AuthToken> = RealStorage.Factory<AuthToken>()
     .create(
       file = File("${serverInfo.dataDir}/auth_token.json"),
       initial = AuthToken(),
       serializer = serializer(),
       dispatcher = dispatcher,
-      logger = lfdLogger
+      logger = lfdLogger,
+      dryRun = dryRun
     )
 
   @Provides
   fun wishlistSyncHistory(
     serverInfo: ServerInfo,
     lfdLogger: Logger,
-    @Io dispatcher: CoroutineDispatcher
+    @Io dispatcher: CoroutineDispatcher,
+    @Named("dryRun") dryRun: Boolean
   ): Storage<WishlistSyncHistory> = RealStorage.Factory<WishlistSyncHistory>()
     .create(
       file = File("${serverInfo.dataDir}/wishlist_sync_history.json"),
       initial = WishlistSyncHistory(emptyMap()),
       serializer = serializer(),
       dispatcher = dispatcher,
-      logger = lfdLogger
+      logger = lfdLogger,
+      dryRun = dryRun
     )
 
   @Provides
   fun libraryMetadata(
     serverInfo: ServerInfo,
     lfdLogger: Logger,
-    @Io dispatcher: CoroutineDispatcher
+    @Io dispatcher: CoroutineDispatcher,
+    @Named("dryRun") dryRun: Boolean
   ): Storage<LibraryMetadata> = RealStorage.Factory<LibraryMetadata>()
     .create(
       file = File("${serverInfo.dataDir}/libro_library.json"),
       initial = LibraryMetadata(),
       serializer = serializer(),
       dispatcher = dispatcher,
-      logger = lfdLogger
+      logger = lfdLogger,
+      dryRun = dryRun
     )
 }

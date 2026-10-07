@@ -4,13 +4,13 @@ import com.vishnurajeevan.libroabs.App
 import com.vishnurajeevan.libroabs.StorageMigrator
 import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.models.Logger
-import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.models.server.createPath
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import net.bramp.ffmpeg.FFmpeg
@@ -67,6 +67,10 @@ interface AppComponent {
   @Provides
   @Named("parallel")
   fun parallelCount(): Int = serverInfo.parallelCount
+
+  @Provides
+  @Named("dryRun")
+  fun dryRun(): Boolean = serverInfo.dryRun
 
   @Provides
   @SingleIn(AppScope::class)
