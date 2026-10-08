@@ -87,7 +87,7 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
 ```
 services:
   librofm-downloader:
-    image: ghcr.io/burntcookie90/librofm-downloader:latest
+    image: git.lumu.au/luke/librofm-downloader:latest
     volumes:
       - /mnt/runtime/appdata/librofm-downloader:/data
       - /mnt/user/media/audiobooks:/media
