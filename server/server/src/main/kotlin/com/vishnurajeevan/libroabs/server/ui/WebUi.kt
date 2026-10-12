@@ -193,13 +193,13 @@ private val WebUiErrorPages = createApplicationPlugin("WebUiErrorPages") {
     if (!path.startsWith("/ui")) return@on
     call.application.log.error("Web UI request failed: ${call.request.httpMethod.value} $path", cause)
     if (call.isHtmx()) {
-      call.response.headers.append("HX-Trigger", toastTrigger("Something went wrong: ${cause.message ?: cause::class.simpleName}", "bad"))
+      call.response.headers.append("HX-Trigger", toastTrigger("Something went wrong. Check the server logs for details.", "bad"))
       call.respond(HttpStatusCode.InternalServerError)
     } else {
       call.respondPage("Error", null, HttpStatusCode.InternalServerError) {
         pageHead("Something went wrong")
         div("card") {
-          p { +(cause.message ?: cause::class.simpleName ?: "Unexpected error") }
+          p { +"An unexpected error occurred. Check the server logs for details." }
         }
       }
     }

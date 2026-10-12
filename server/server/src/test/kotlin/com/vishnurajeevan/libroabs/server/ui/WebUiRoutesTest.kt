@@ -504,6 +504,23 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun errorsDoNotRevealExceptionDetails() = try {
+    testApplication {
+      application {
+        installWebUi(backend())
+        routing { get("/ui/boom") { error("/secret/path/data.db is locked") } }
+      }
+      val page = browser().get("/ui/boom")
+      assertEquals(HttpStatusCode.InternalServerError, page.status)
+      assertFalse(page.bodyAsText().contains("/secret/path"))
+      val htmx = browser().htmxGet("/ui/boom")
+      assertFalse(htmx.headers["HX-Trigger"].orEmpty().contains("secret"))
+    }
+  } finally {
+    scope.cancel()
+  }
+
+  @Test
   fun otherSitesCannotPostToTheLoginForm() = ui(backend("pw")) {
     val response = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("Sec-Fetch-Site", "cross-site") }
     assertEquals(HttpStatusCode.Forbidden, response.status)
