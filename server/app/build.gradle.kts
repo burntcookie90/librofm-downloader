@@ -48,4 +48,5 @@ dependencies {
   implementation(libs.ktorfit.response)
 
   testImplementation(libs.kotlin.test.junit)
+  testImplementation(libs.ktor.client.mock)
 }

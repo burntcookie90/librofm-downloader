@@ -122,6 +122,34 @@ class DownloadServiceTest {
   }
 
   @Test
+  fun renamingOnlyTouchesTheExtractedChapters() = await {
+    downloader.m4bAvailable = false
+    downloader.tracks = listOf(Tracks(1, "Opening"), Tracks(2, "Ending"))
+    downloader.mp3Names = listOf("part-b.mp3", "part-a.mp3")
+    val dir = File(tmp, "4").apply { mkdirs() }
+    File(dir, "cover.jpg").writeText("cover")
+    File(dir, "Extras.pdf").writeText("pdf")
+    val r = service(info(BookFormat.MP3, renameChapters = true)).enqueue(book("4", "Tale"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(
+      listOf("1 - Tale - Opening.mp3", "2 - Tale - Ending.mp3", "Extras.pdf", "cover.jpg"),
+      dir.list()!!.sorted(),
+    )
+    // chapters are assigned in name order
+    assertEquals("part-a.mp3", File(dir, "1 - Tale - Opening.mp3").readText())
+  }
+
+  @Test
+  fun chaptersAreLeftAloneWhenTheyDontMatchTheTracks() = await {
+    downloader.m4bAvailable = false
+    downloader.tracks = listOf(Tracks(1, "Opening"), Tracks(2, "Ending"))
+    downloader.mp3Names = listOf("only.mp3")
+    val r = service(info(BookFormat.MP3, renameChapters = true)).enqueue(book("5"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(listOf("only.mp3"), File(tmp, "5").list()!!.toList())
+  }
+
+  @Test
   fun convertFallbackConvertsAfterMp3Download() = await {
     downloader.m4bAvailable = false
     val r = service(info(BookFormat.M4B_CONVERT_FALLBACK)).enqueue(book("3"), AttemptTrigger.SCHEDULED)

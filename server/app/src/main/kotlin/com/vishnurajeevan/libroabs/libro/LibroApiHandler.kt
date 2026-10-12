@@ -24,21 +24,13 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.prepareGet
 import io.ktor.http.Url
-import io.ktor.util.cio.writeChannel
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.copyAndClose
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.io.RawSink
 import kotlinx.io.asSink
 import java.io.File
-import java.util.zip.ZipInputStream
-import kotlin.io.path.createDirectories
-import kotlin.io.path.outputStream
 
 @Inject
 @ContributesBinding(AppScope::class, binding = binding<LibroFmBooks>())
@@ -114,47 +106,20 @@ class LibroApiHandler(
     if (!dryRun) {
       lfdLogger.v("Downloading M4B: $m4bUrl")
       val url = Url(m4bUrl)
-      val contentDisposition = url.parameters["response-content-disposition"]!!
-
-      val filenameRegex = "filename=\"?([^\"]+)\"?".toRegex()
-      val match = filenameRegex.find(contentDisposition)
-
-      val filename = match?.groupValues?.getOrNull(1)?.replace("+", " ")
-      downloadFile(url, targetDirectory.resolveWithin(filename!!.toSafePathSegment()))
+      downloadFile(url, targetDirectory.resolveWithin(m4bFilename(url).toSafePathSegment()))
     }
   }
 
-  override suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File) {
-    data.forEachIndexed { index, part ->
-      if (!dryRun) {
-        val url = part.url
-        lfdLogger.v("downloading part ${index + 1}")
-        val destinationFile = File(targetDirectory, "part-$index.zip")
-        downloadFile(Url(url), destinationFile)
-
-        ZipInputStream(destinationFile.inputStream()).use { zipIn ->
-          var entry = zipIn.nextEntry
-          while (entry != null) {
-            val entryPath = targetDirectory.resolveWithin(entry.name).toPath()
-
-            if (entry.isDirectory) {
-              // Create directory
-              entryPath.createDirectories()
-            } else {
-              // Ensure parent directory exists
-              entryPath.parent?.createDirectories()
-
-              // Extract file
-              entryPath.outputStream().use { output ->
-                zipIn.copyTo(output)
-              }
-            }
-
-            // Move to next entry
-            entry = zipIn.nextEntry
-          }
-        }
-        destinationFile.delete()
+  override suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File): List<File> {
+    if (dryRun) return emptyList()
+    return data.flatMapIndexed { index, part ->
+      lfdLogger.v("downloading part ${index + 1}")
+      val zip = File(targetDirectory, "part-$index.zip")
+      try {
+        downloadFile(Url(part.url), zip)
+        withContext(ioDispatcher) { extractZip(zip, targetDirectory) }
+      } finally {
+        zip.delete()
       }
     }
   }
@@ -215,8 +180,6 @@ class LibroApiHandler(
       ----
     """.trimIndent()
     )
-    downloadClient.prepareGet(url).execute {
-      it.body<ByteReadChannel>().copyAndClose(destinationFile.writeChannel())
-    }
+    downloadClient.downloadTo(url, destinationFile)
   }
 }
