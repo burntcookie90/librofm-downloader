@@ -1,9 +1,7 @@
 package com.vishnurajeevan.libroabs.models.server
 
 import dev.zacsweers.redacted.annotations.Redacted
-import kotlinx.serialization.Serializable
 
-@Serializable
 data class ServerInfo(
   val libroUserName: String,
   @Redacted val libroPassword: String,

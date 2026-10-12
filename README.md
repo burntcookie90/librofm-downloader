@@ -46,7 +46,6 @@ Endpoints:
 - `GET`: `/history` returns a json with your download history
 - `GET`: `/history/{isbn}` returns the single entry for an isbn
 - `DELETE`: `/history/{isbn}` deletes the history entry for an isbn
-- `GET`: `/info` returns the current configuration (credentials are never included)
 
 
 ----

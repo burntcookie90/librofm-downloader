@@ -3,7 +3,6 @@ package com.vishnurajeevan.libroabs.server
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.server.route.DownloadHistory
-import com.vishnurajeevan.libroabs.server.route.Info
 import com.vishnurajeevan.libroabs.server.route.RouteHandler
 import com.vishnurajeevan.libroabs.server.route.Update
 import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
