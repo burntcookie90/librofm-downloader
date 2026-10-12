@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * Tracks the state of full library syncs so the UI can show whether one is running and how the last one went.
@@ -71,10 +72,13 @@ class SyncController(
     }
   }
 
+  /** Held for the whole of a sync, whatever started it, so syncs never overlap. */
+  private val exclusive = Mutex()
+
   /** Starts a sync in the background. Returns `false` if one is already running or none is registered. */
   fun requestSync(trigger: SyncTrigger, overwrite: Boolean): Boolean {
     val run = runner ?: return false
-    if (_state.value.running) return false
+    if (!exclusive.tryLock()) return false
     // Undispatched, so the running state is visible as soon as this returns.
     appScope.launch(start = CoroutineStart.UNDISPATCHED) {
       try {
@@ -83,7 +87,23 @@ class SyncController(
         throw e
       } catch (e: Throwable) {
         logger.i("Sync failed: ${e.describe()}")
+      } finally {
+        exclusive.unlock()
       }
+    }
+    return true
+  }
+
+  /** Runs [block] (a sync) unless one is already running, in which case it is skipped and `false` returned. */
+  suspend fun runIfIdle(trigger: SyncTrigger, block: suspend () -> Unit): Boolean {
+    if (!exclusive.tryLock()) {
+      logger.i("Skipping ${trigger.name.lowercase()} sync: another sync is still running")
+      return false
+    }
+    try {
+      block()
+    } finally {
+      exclusive.unlock()
     }
     return true
   }
