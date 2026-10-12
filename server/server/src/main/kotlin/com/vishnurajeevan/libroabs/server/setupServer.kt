@@ -61,11 +61,8 @@ fun setupServer(
         get<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
         delete<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
 
+        // Unauthenticated uptime check; it must not reveal anything derived from the configuration.
         head("/") {
-          call.response.headers.append(
-            "App-Hash",
-            "${serverInfo.hashCode()}"
-          )
           call.respond("")
         }
         get("/") {
