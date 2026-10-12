@@ -110,5 +110,18 @@ services:
       - HEALTHCHECK_ID=<>
 ```
 
+### Running as a non-root user
+The container runs as UID/GID `1000:1000`, not root. `/data` and `/media` must be writable by that user:
+```
+chown -R 1000:1000 /mnt/runtime/appdata/librofm-downloader /mnt/user/media/audiobooks
+```
+To run as a different user instead (for example to match existing files, or `99:100` on Unraid), set it in compose:
+```
+services:
+  librofm-downloader:
+    user: "99:100"
+```
+Images before this change ran as root, so files they created are owned by root; fix their ownership as above when upgrading.
+
 To be notified when sync is failing visit https://healthchecks.io, create a check, and specify
 the ID to the container using the `HEALTHCHECK_ID` environment variable.
