@@ -445,6 +445,14 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun sessionCookieIsSecureBehindAnHttpsProxy() = ui(backend("pw")) {
+    val direct = browser().submitForm("/ui/login", parameters { append("password", "pw") })
+    assertFalse(direct.headers[HttpHeaders.SetCookie].orEmpty().contains("Secure"))
+    val proxied = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("X-Forwarded-Proto", "https") }
+    assertContains(proxied.headers[HttpHeaders.SetCookie].orEmpty(), "Secure")
+  }
+
+  @Test
   fun loginIgnoresOpenRedirects() = ui(backend("pw")) {
     val login = browser().submitForm("/ui/login", parameters {
       append("password", "pw")

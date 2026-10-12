@@ -53,7 +53,7 @@ fun Application.installWebUi(backend: WebUiBackend) {
     get("/ui/login") { loginPage(signer, null) }
     post("/ui/login") { handleLogin(signer, throttle) }
     post("/ui/logout") {
-      call.response.cookies.append(sessionCookie("", 0, call.request.origin.scheme == "https"))
+      call.response.cookies.append(sessionCookie("", 0, call.isHttps()))
       call.response.headers.append("HX-Redirect", "/ui/login")
       call.respond(HttpStatusCode.OK)
     }
@@ -130,6 +130,13 @@ private suspend fun ApplicationCall.rejectUnauthenticated(path: String) {
   }
 }
 
+/**
+ * Whether the browser reached us over HTTPS, including through a TLS-terminating reverse proxy. Only used to mark
+ * cookies Secure, so a client forging X-Forwarded-Proto can only make its own cookie stricter.
+ */
+private fun ApplicationCall.isHttps() =
+  request.origin.scheme == "https" || request.headers["X-Forwarded-Proto"]?.substringBefore(',')?.trim().equals("https", ignoreCase = true)
+
 private fun sessionCookie(value: String, maxAge: Long, secure: Boolean) = Cookie(
   name = SessionSigner.COOKIE_NAME,
   value = value,
@@ -163,7 +170,7 @@ private suspend fun RoutingContext.handleLogin(signer: SessionSigner?, throttle:
       loginForm("Too many incorrect attempts. Try again in a few minutes.", safeNext(form["next"]))
     }
   } else if (throttle.attempt(client) { signer.passwordMatches(form["password"]) }) {
-    call.response.cookies.append(sessionCookie(signer.issue(), signer.ttl, call.request.origin.scheme == "https"))
+    call.response.cookies.append(sessionCookie(signer.issue(), signer.ttl, call.isHttps()))
     call.respondRedirect(safeNext(form["next"]))
   } else {
     val next = safeNext(form["next"])
