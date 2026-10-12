@@ -8,6 +8,7 @@ import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.models.server.resolveWithin
 import com.vishnurajeevan.libroabs.models.server.createPath
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
@@ -71,7 +72,7 @@ interface AppComponent {
   @Provides
   @SingleIn(AppScope::class)
   fun providesTargetDir(lfdLogger: Logger): (Book) -> File = { book ->
-    File("${serverInfo.mediaDir}/${book.createPath(serverInfo.pathPattern)}")
+    File(serverInfo.mediaDir).resolveWithin(book.createPath(serverInfo.pathPattern))
       .also {
         lfdLogger.v("Target Directory: $it")
       }
