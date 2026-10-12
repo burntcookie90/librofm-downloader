@@ -2,6 +2,7 @@ package com.vishnurajeevan.libroabs.graph
 
 import com.vishnurajeevan.libroabs.libro.LibroAPI
 import com.vishnurajeevan.libroabs.libro.createLibroAPI
+import com.vishnurajeevan.libroabs.libro.configureLibroApi
 import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
@@ -52,20 +53,7 @@ interface NetworkComponent {
   @Provides
   fun libroApi(client: HttpClient, serverInfo: ServerInfo): LibroAPI = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
-    .httpClient(client.config {
-      defaultRequest {
-        contentType(ContentType.Application.Json)
-        serverInfo.libroFmHeaders.forEach { key, value ->
-          header(key, value)
-        }
-      }
-      install(ContentNegotiation) {
-        json(Json {
-          isLenient = true
-          ignoreUnknownKeys = true
-        })
-      }
-    })
+    .httpClient(client.config { configureLibroApi(serverInfo.libroFmHeaders) })
     .converterFactories(ResponseConverterFactory())
     .build()
     .createLibroAPI()

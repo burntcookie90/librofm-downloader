@@ -26,7 +26,8 @@ import dev.zacsweers.metro.binding
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.io.RawSink
 import kotlinx.io.asSink
@@ -47,57 +48,70 @@ class LibroApiHandler(
 ) : LibroFmBooks {
   private val dryRun = serverInfo.dryRun
 
+  @Volatile private var credentials: Pair<String, String>? = null
+  private val loginMutex = Mutex()
+
   suspend fun fetchLoginData(username: String, password: String) = withContext(ioDispatcher) {
+    credentials = username to password
     val saved = authTokenStorage.getData()
     // Log in again when the configured account changed, otherwise the old account's library keeps syncing.
     if (saved.token.isNullOrEmpty() || saved.username != username) {
-      val tokenData = libroAPI.fetchLoginData(
-        LoginRequest(username = username, password = password)
-      )
-      if (tokenData.access_token != null) {
-        authTokenStorage.update {
-          it.copy(
-            token = tokenData.access_token,
-            username = username,
-          )
-        }
-        println("Login success!")
-      } else {
-        println("Login failed!")
-        throw IllegalArgumentException("failed login!")
-      }
+      login(username, password)
     }
   }
 
-  private val token by lazy { runBlocking { "Bearer ${authTokenStorage.getData().token}" } }
-
-  suspend fun fetchLibrary(page: Int = 1) = withContext(ioDispatcher) {
-    libroLibraryStorage.update {
-      val firstPage = libroAPI.fetchLibrary(authToken = token, page = page)
-
-      if (firstPage.total_pages > 1) {
-        var allPages = firstPage
-        (2..firstPage.total_pages)
-          .forEach { i ->
-            val nextPage= libroAPI.fetchLibrary(token, i)
-            allPages = allPages.copy(
-              audiobooks = allPages.audiobooks + nextPage.audiobooks
-            )
-          }
-        allPages
-      }
-      else {
-        firstPage
-      }
+  private suspend fun login(username: String, password: String) {
+    val tokenData = try {
+      libroAPI.fetchLoginData(LoginRequest(username = username, password = password))
+    } catch (e: LibroUnauthorizedException) {
+      throw IllegalArgumentException("libro.fm rejected the login; check LIBRO_FM_USERNAME and LIBRO_FM_PASSWORD", e)
     }
+    val accessToken = tokenData.access_token ?: throw IllegalArgumentException("libro.fm login failed: no token returned")
+    authTokenStorage.update { it.copy(token = accessToken, username = username) }
+    lfdLogger.i("Logged in to libro.fm as $username")
+  }
+
+  private suspend fun token(): String = "Bearer ${authTokenStorage.getData().token}"
+
+  /** Runs [call] with the saved token. If libro.fm rejects the token, logs in again once and retries. */
+  private suspend fun <T> authorized(call: suspend (token: String) -> T): T {
+    val token = token()
+    return try {
+      call(token)
+    } catch (e: LibroUnauthorizedException) {
+      loginMutex.withLock {
+        // Parallel downloads can all be rejected at once; only the first one logs in again.
+        if (token() == token) {
+          val (username, password) = credentials ?: throw e
+          lfdLogger.i("libro.fm rejected the saved token, logging in again")
+          login(username, password)
+        }
+      }
+      call(token())
+    }
+  }
+
+  suspend fun fetchLibrary() = withContext(ioDispatcher) {
+    val firstPage = authorized { libroAPI.fetchLibrary(authToken = it, page = 1) }.requireNoError()
+    val library = (2..firstPage.total_pages).fold(firstPage) { all, page ->
+      val next = authorized { libroAPI.fetchLibrary(authToken = it, page = page) }.requireNoError()
+      all.copy(audiobooks = all.audiobooks + next.audiobooks)
+    }
+    libroLibraryStorage.update { library }
+  }
+
+  /** libro.fm error bodies deserialize into an empty library; never save one of those over the real thing. */
+  private fun LibraryMetadata.requireNoError() = also {
+    error?.let { throw IllegalStateException("libro.fm library request failed: $it") }
   }
 
   override suspend fun getLocalLibrary(): LibraryMetadata = withContext(ioDispatcher) { libroLibraryStorage.getData() }
 
-  override suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata = libroAPI.fetchDownloadMetadata(token, isbn)
+  override suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata =
+    authorized { libroAPI.fetchDownloadMetadata(it, isbn) }
 
   override suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
-    val response = libroAPI.fetchM4BMetadata(token, isbn)
+    val response = authorized { libroAPI.fetchM4BMetadata(it, isbn) }
     return if (response.isSuccessful) {
       Result.success(response.body()!!)
     } else {
@@ -134,11 +148,13 @@ class LibroApiHandler(
   ) {
     data.forEach { pdfExtra ->
       lfdLogger.v("Download PDF Extras for $isbn")
-      val downloadUrl = libroAPI.fetchPdfExtraUrl(
-        authToken = token,
-        isbn = isbn,
-        filename = pdfExtra.filename
-      )
+      val downloadUrl = authorized {
+        libroAPI.fetchPdfExtraUrl(
+          authToken = it,
+          isbn = isbn,
+          filename = pdfExtra.filename
+        )
+      }
       if (!dryRun) {
         downloadFile(
           url = Url(downloadUrl.pdf_url),
@@ -159,20 +175,20 @@ class LibroApiHandler(
       )
       .forEach { isbn ->
         lfdLogger.v("Syncing wishlist for $isbn")
-        val response = libroAPI.addToWishlist(authToken = token, isbn = isbn)
+        val response = authorized { libroAPI.addToWishlist(authToken = it, isbn = isbn) }
         val status = if (response.isSuccessful) WishlistItemSyncStatus.SUCCESS else WishlistItemSyncStatus.FAILURE
         dbWriter.write(LibroFmWishlistSyncStatus(isbn, status))
       }
   }
 
   suspend fun fetchWishlist() = withContext(ioDispatcher) {
-    libroAPI.fetchWishlist(token)
+    authorized { libroAPI.fetchWishlist(it) }
       .data
       .wishlist
   }
 
   override suspend fun fetchBookDetails(isbn: String): Book = withContext(ioDispatcher) {
-    libroAPI.fetchAudiobookDetails(token, isbn).data.audiobook
+    authorized { libroAPI.fetchAudiobookDetails(it, isbn) }.data.audiobook
   }
 
   private suspend fun downloadFile(url: Url, destinationFile: File) = withContext(ioDispatcher) {
