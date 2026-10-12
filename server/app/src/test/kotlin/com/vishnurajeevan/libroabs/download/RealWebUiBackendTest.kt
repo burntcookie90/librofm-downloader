@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeout
@@ -27,6 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class RealWebUiBackendTest {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -218,6 +220,26 @@ class RealWebUiBackendTest {
     val done = backend.syncSnapshot()
     assertEquals(null, done.lastError)
     assertTrue(done.lastFinishedAt != null)
+  }
+
+  @Test
+  fun scheduledSyncsSkipWhileAnotherRunsAndBlockManualOnes() = run {
+    val gate = CompletableDeferred<Unit>()
+    sync.runner = { trigger, overwrite -> sync.track(trigger, overwrite) { gate.await() } }
+    assertTrue(backend.requestSync(false))
+    var ran = false
+    assertFalse(sync.runIfIdle(SyncTrigger.SCHEDULED) { ran = true })
+    assertFalse(ran)
+    gate.complete(Unit)
+    while (backend.syncSnapshot().running) delay(5)
+
+    val scheduled = CompletableDeferred<Unit>()
+    val job = CoroutineScope(Dispatchers.Default).launch { sync.runIfIdle(SyncTrigger.SCHEDULED) { sync.track(SyncTrigger.SCHEDULED, false) { scheduled.await() } } }
+    while (!backend.syncSnapshot().running) delay(5)
+    assertFalse(backend.requestSync(false), "a manual sync can't start during a scheduled one")
+    scheduled.complete(Unit)
+    job.join()
+    assertTrue(backend.requestSync(false))
   }
 
   @Test

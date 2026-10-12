@@ -42,7 +42,7 @@ The JSON endpoints below also require the password in that case, sent as `Author
 ### API Server
 Endpoints:
 - `GET`: `/` redirects to the web UI at `/ui`
-- `GET`: `/update` allows you to manually force a refresh (ie: when you just purchased a book). Pass `?overwrite=true` to force download your library.
+- `GET`: `/update` allows you to manually force a refresh (ie: when you just purchased a book). Pass `?overwrite=true` to force download your library. The sync runs in the background; the endpoint answers `409 Conflict` if one is already running.
 - `GET`: `/history` returns a json with your download history
 - `GET`: `/history/{isbn}` returns the single entry for an isbn
 - `DELETE`: `/history/{isbn}` deletes the history entry for an isbn

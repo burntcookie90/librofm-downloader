@@ -73,7 +73,9 @@ class App(
     syncController.runner = { trigger, overwrite -> fullUpdate(overwrite = overwrite, trigger = trigger) }
 
     appScope.launch {
-      fullUpdate(delayForInitial = !serverInfo.dryRun, trigger = SyncTrigger.STARTUP)
+      syncController.runIfIdle(SyncTrigger.STARTUP) {
+        fullUpdate(delayForInitial = !serverInfo.dryRun, trigger = SyncTrigger.STARTUP)
+      }
     }
 
     appScope.launch {
@@ -90,7 +92,7 @@ class App(
           lfdLogger.i("Checking library on pulse!")
           supervisorScope {
             try {
-              fullUpdate(trigger = SyncTrigger.SCHEDULED)
+              syncController.runIfIdle(SyncTrigger.SCHEDULED) { fullUpdate(trigger = SyncTrigger.SCHEDULED) }
             } catch (e: Exception) {
               lfdLogger.i("Pulse update failed: ${e.message}")
             }
@@ -99,7 +101,7 @@ class App(
     }
 
     setupServer(
-      onUpdate = { fullUpdate(overwrite = it, trigger = SyncTrigger.API) },
+      onUpdate = { syncController.requestSync(SyncTrigger.API, it) },
       serverInfo = serverInfo,
       webUiBackend = webUiBackend,
       routeHandlerMap = routeHandlerMap,

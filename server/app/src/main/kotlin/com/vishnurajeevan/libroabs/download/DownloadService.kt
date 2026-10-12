@@ -223,12 +223,14 @@ class DownloadService(
   }
 
   private suspend fun downloadMp3sAndRename(book: Book, targetDir: File) {
-    val downloadData = downloadBookAsMp3s(book, targetDir)
+    val downloadData = libroClient.fetchMp3DownloadMetadata(book.isbn)
+    val files = libroClient.downloadMp3s(data = downloadData.parts, targetDirectory = targetDir)
 
     if (serverInfo.renameChapters) {
       renameChapters(
         title = book.title,
         tracks = downloadData.tracks,
+        files = files,
         targetDirectory = targetDir,
         writeTitleTag = serverInfo.writeTitleTag
       )
@@ -265,9 +267,7 @@ class DownloadService(
     var downloadMetaData: Mp3DownloadMetadata? = null
 
     // Check that book is downloaded and Mp3s are present
-    if (!targetDir.exists()
-      && targetDir.listFiles { it.extension == "mp3" }.isEmpty()
-    ) {
+    if (!targetDir.exists()) {
       lfdLogger.v("Book ${book.title} is not downloaded yet!")
       targetDir.mkdirs()
       downloadMetaData = downloadBookAsMp3s(book, targetDir)
@@ -305,9 +305,11 @@ class DownloadService(
       ?.forEach { it.delete() }
   }
 
+  /** Renames the chapter [files] just extracted for a book; anything else in the folder is left alone. */
   private suspend fun renameChapters(
     title: String,
     tracks: List<Tracks>,
+    files: List<File>,
     targetDirectory: File,
     writeTitleTag: Boolean
   ) = withContext(ioDispatcher) {
@@ -319,9 +321,14 @@ class DownloadService(
 
     val trackTitles = createTrackTitles(sortedTracks)
 
-    targetDirectory.listFiles()
-      ?.sortedBy { it.nameWithoutExtension }
-      ?.forEachIndexed({ index, file ->
+    val chapters = files.filter { it.extension.equals("mp3", ignoreCase = true) }.sortedBy { it.nameWithoutExtension }
+    if (chapters.size != sortedTracks.size) {
+      lfdLogger.i("Not renaming chapters of $title: ${chapters.size} MP3s but ${sortedTracks.size} tracks")
+      return@withContext
+    }
+
+    chapters
+      .forEachIndexed({ index, file ->
         val newFilename = newFilenames[index]
         val newFile = File(targetDirectory, "$newFilename.${file.extension}")
         file.renameTo(newFile)

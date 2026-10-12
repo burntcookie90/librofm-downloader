@@ -15,6 +15,7 @@ interface LibroFmBooks {
   suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata
   suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata>
   suspend fun downloadM4b(m4bUrl: String, targetDirectory: File)
-  suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File)
+  /** Downloads and extracts the MP3 parts, returning the extracted files. */
+  suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File): List<File>
   suspend fun downloadPdfExtras(isbn: String, data: List<PdfExtra>, targetDirectory: File)
 }

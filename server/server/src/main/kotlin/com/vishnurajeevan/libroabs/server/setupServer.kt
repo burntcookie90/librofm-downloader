@@ -7,6 +7,7 @@ import com.vishnurajeevan.libroabs.server.route.RouteHandler
 import com.vishnurajeevan.libroabs.server.route.Update
 import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
 import com.vishnurajeevan.libroabs.server.ui.installWebUi
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.engine.EmbeddedServer
@@ -19,6 +20,7 @@ import io.ktor.server.resources.Resources
 import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
@@ -29,7 +31,8 @@ import kotlin.reflect.KClass
 
 @Suppress("UNCHECKED_CAST")
 fun setupServer(
-  onUpdate: suspend (overwrite: Boolean) -> Unit = {},
+  /** Starts a sync in the background; returns false if one is already running. */
+  onUpdate: (overwrite: Boolean) -> Boolean = { false },
   serverInfo: ServerInfo,
   webUiBackend: WebUiBackend? = null,
   routeHandlerMap: Map<KClass<*>, RouteHandler<*>>,
@@ -53,8 +56,12 @@ fun setupServer(
       if (webUiBackend != null) installWebUi(webUiBackend)
       routing {
         get<Update> {
-          routeHandlerMap.handleRoute(it)
-          onUpdate(it.overwrite ?: false)
+          val overwrite = it.overwrite ?: false
+          if (onUpdate(overwrite)) {
+            call.respondText("Updating, overwrite: $overwrite!")
+          } else {
+            call.respondText("A sync is already running.", status = HttpStatusCode.Conflict)
+          }
         }
 
         get<DownloadHistory> { routeHandlerMap.handleRoute(it) }
