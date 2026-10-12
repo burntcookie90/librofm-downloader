@@ -48,14 +48,17 @@ class LibroApiHandler(
   private val dryRun = serverInfo.dryRun
 
   suspend fun fetchLoginData(username: String, password: String) = withContext(ioDispatcher) {
-    if (authTokenStorage.getData().token.isNullOrEmpty()) {
+    val saved = authTokenStorage.getData()
+    // Log in again when the configured account changed, otherwise the old account's library keeps syncing.
+    if (saved.token.isNullOrEmpty() || saved.username != username) {
       val tokenData = libroAPI.fetchLoginData(
         LoginRequest(username = username, password = password)
       )
       if (tokenData.access_token != null) {
         authTokenStorage.update {
           it.copy(
-            token = tokenData.access_token
+            token = tokenData.access_token,
+            username = username,
           )
         }
         println("Login success!")
