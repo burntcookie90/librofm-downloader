@@ -99,7 +99,7 @@ class App(
     }
 
     setupServer(
-      onUpdate = { fullUpdate(overwrite = it, trigger = SyncTrigger.API) },
+      onUpdate = { syncController.requestSync(SyncTrigger.API, it) },
       serverInfo = serverInfo,
       webUiBackend = webUiBackend,
       routeHandlerMap = routeHandlerMap,
