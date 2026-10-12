@@ -36,7 +36,6 @@ import kotlinx.coroutines.delay
 import kotlinx.html.FlowContent
 import kotlinx.html.div
 import kotlinx.html.p
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Installs the browser UI under `/ui` and, when a web UI password is configured, guards it and the JSON API.
@@ -44,14 +43,15 @@ import java.util.concurrent.atomic.AtomicInteger
 fun Application.installWebUi(backend: WebUiBackend) {
   val password = backend.serverInfo.webUiPassword?.takeIf { it.isNotEmpty() }
   val signer = password?.let { SessionSigner(it) }
+  val throttle = LoginThrottle()
 
-  installGuards(signer)
+  installGuards(signer, throttle)
   install(WebUiErrorPages)
 
   routing {
     staticResources("/ui/static", "webui")
     get("/ui/login") { loginPage(signer, null) }
-    post("/ui/login") { handleLogin(signer) }
+    post("/ui/login") { handleLogin(signer, throttle) }
     post("/ui/logout") {
       call.response.cookies.append(sessionCookie("", 0, call.request.origin.scheme == "https"))
       call.response.headers.append("HX-Redirect", "/ui/login")
@@ -67,13 +67,13 @@ fun Application.installWebUi(backend: WebUiBackend) {
 // auth
 // ---------------------------------------------------------------------------------------------
 
-private fun Application.installGuards(signer: SessionSigner?) {
+private fun Application.installGuards(signer: SessionSigner?, throttle: LoginThrottle) {
   intercept(ApplicationCallPipeline.Plugins) {
     val path = call.request.path()
     val method = call.request.httpMethod
     if (signer != null) {
       val public = path.startsWith("/ui/static/") || path == "/ui/login" || (path == "/" && method == HttpMethod.Head)
-      if (!public && !call.isAuthorized(signer)) {
+      if (!public && !call.isAuthorized(signer, throttle)) {
         call.rejectUnauthenticated(path)
         finish()
         return@intercept
@@ -88,13 +88,11 @@ private fun Application.installGuards(signer: SessionSigner?) {
   }
 }
 
-private fun ApplicationCall.isAuthorized(signer: SessionSigner): Boolean {
+private fun ApplicationCall.isAuthorized(signer: SessionSigner, throttle: LoginThrottle): Boolean {
   if (signer.verify(request.cookies[SessionSigner.COOKIE_NAME])) return true
-  val bearer = request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.takeIf {
-    request.headers[HttpHeaders.Authorization]?.startsWith("Bearer ") == true
-  }
-  if (signer.passwordMatches(bearer)) return true
-  return signer.passwordMatches(request.headers["X-Api-Key"])
+  val bearer = request.headers[HttpHeaders.Authorization]?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
+  val key = bearer ?: request.headers["X-Api-Key"] ?: return false
+  return throttle.attempt(request.origin.remoteHost) { signer.passwordMatches(key) }
 }
 
 private suspend fun ApplicationCall.rejectUnauthenticated(path: String) {
@@ -126,8 +124,6 @@ private fun sessionCookie(value: String, maxAge: Long, secure: Boolean) = Cookie
   extensions = mapOf("SameSite" to "Strict"),
 )
 
-private val failedLogins = AtomicInteger(0)
-
 private suspend fun RoutingContext.loginPage(signer: SessionSigner?, error: String?) {
   if (signer == null) {
     call.respondRedirect("/ui")
@@ -139,19 +135,21 @@ private suspend fun RoutingContext.loginPage(signer: SessionSigner?, error: Stri
   }
 }
 
-private suspend fun RoutingContext.handleLogin(signer: SessionSigner?) {
+private suspend fun RoutingContext.handleLogin(signer: SessionSigner?, throttle: LoginThrottle) {
   if (signer == null) {
     call.respondRedirect("/ui")
     return
   }
   val form = call.receiveParameters()
-  if (signer.passwordMatches(form["password"])) {
-    failedLogins.set(0)
+  val client = call.request.origin.remoteHost
+  if (throttle.isLocked(client)) {
+    call.respondBarePage("Sign in", HttpStatusCode.TooManyRequests) {
+      loginForm("Too many incorrect attempts. Try again in a few minutes.", safeNext(form["next"]))
+    }
+  } else if (throttle.attempt(client) { signer.passwordMatches(form["password"]) }) {
     call.response.cookies.append(sessionCookie(signer.issue(), signer.ttl, call.request.origin.scheme == "https"))
     call.respondRedirect(safeNext(form["next"]))
   } else {
-    // Slow down guessing; the delay grows with consecutive failures.
-    delay(minOf(failedLogins.incrementAndGet() * 400L, 4000L))
     val next = safeNext(form["next"])
     call.respondBarePage("Sign in", HttpStatusCode.Unauthorized) { loginForm("Incorrect password.", next) }
   }

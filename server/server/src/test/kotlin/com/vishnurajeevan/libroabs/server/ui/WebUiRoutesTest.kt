@@ -459,6 +459,18 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun repeatedWrongApiKeysLockOutPasswordsButNotSessions() = ui(backend("pw")) {
+    val client = browser()
+    assertEquals(HttpStatusCode.Found, client.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    val api = browser()
+    repeat(5) { api.get("/ui/queue") { header("X-Api-Key", "guess-$it") } }
+    assertEquals(HttpStatusCode.Found, api.get("/ui/queue") { header("X-Api-Key", "pw") }.status)
+    assertEquals(HttpStatusCode.TooManyRequests, api.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    // an existing session keeps working
+    assertEquals(HttpStatusCode.OK, client.get("/ui/queue").status)
+  }
+
+  @Test
   fun forgedSessionCookieIsRejected() = ui(backend("pw")) {
     val client = browser()
     val response = client.get("/ui/queue") { header(HttpHeaders.Cookie, "libro_session=99999999999.AAAA") }
