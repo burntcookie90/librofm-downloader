@@ -71,6 +71,14 @@ private fun Application.installGuards(signer: SessionSigner?, throttle: LoginThr
   intercept(ApplicationCallPipeline.Plugins) {
     val path = call.request.path()
     val method = call.request.httpMethod
+    // The JSON API is for scripts (and GET /update changes state), and another site's page posting wrong passwords to
+    // the login form would lock the viewer out, so refuse both when a browser makes them on another site's behalf.
+    val api = !path.startsWith("/ui") && path != "/"
+    if ((api || (path == "/ui/login" && method == HttpMethod.Post)) && call.isCrossSite()) {
+      call.respondText("Forbidden", status = HttpStatusCode.Forbidden)
+      finish()
+      return@intercept
+    }
     if (signer != null) {
       val public = path.startsWith("/ui/static/") || path == "/ui/login" || (path == "/" && method == HttpMethod.Head)
       if (!public && !call.isAuthorized(signer, throttle)) {
@@ -86,6 +94,14 @@ private fun Application.installGuards(signer: SessionSigner?, throttle: LoginThr
       finish()
     }
   }
+}
+
+/** True for requests a browser makes on behalf of another site (links, images, forms, fetch). Scripts send neither header. */
+private fun ApplicationCall.isCrossSite(): Boolean {
+  val fetchSite = request.headers["Sec-Fetch-Site"]
+  if (fetchSite != null) return fetchSite == "cross-site" || fetchSite == "same-site"
+  val origin = request.headers[HttpHeaders.Origin] ?: return false
+  return runCatching { java.net.URI(origin).host }.getOrNull() != request.origin.serverHost
 }
 
 private fun ApplicationCall.isAuthorized(signer: SessionSigner, throttle: LoginThrottle): Boolean {
