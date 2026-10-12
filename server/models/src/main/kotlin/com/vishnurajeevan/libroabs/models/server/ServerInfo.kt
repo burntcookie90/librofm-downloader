@@ -1,9 +1,7 @@
 package com.vishnurajeevan.libroabs.models.server
 
 import dev.zacsweers.redacted.annotations.Redacted
-import kotlinx.serialization.Serializable
 
-@Serializable
 data class ServerInfo(
   val libroUserName: String,
   @Redacted val libroPassword: String,
@@ -50,11 +48,11 @@ data class ServerInfo(
       |  Limit: $limit
       |  Path Pattern: $pathPattern
       |  Health Check Host: $healthCheckHost
-      |  Health Check ID: $healthCheckId
+      |  Health Check: ${if (healthCheckId.isNullOrEmpty()) "Disabled" else "Enabled"}
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
-      |  Webhook Urls: $webhookUrls,
-      |  LibroFM Headers: $libroFmHeaders
+      |  Webhooks: ${webhookUrls.map(::webhookHost)}
+      |  LibroFM Headers: ${libroFmHeaders.keys}
       |  Web UI Password Protected: ${!webUiPassword.isNullOrEmpty()}
     """.trimMargin()
   }

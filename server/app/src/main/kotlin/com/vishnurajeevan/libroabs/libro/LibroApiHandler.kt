@@ -13,6 +13,8 @@ import com.vishnurajeevan.libroabs.models.libro.Mp3DownloadMetadata
 import com.vishnurajeevan.libroabs.models.libro.PdfExtra
 import com.vishnurajeevan.libroabs.models.server.M4bMetadata
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.models.server.resolveWithin
+import com.vishnurajeevan.libroabs.models.server.toSafePathSegment
 import com.vishnurajeevan.libroabs.storage.Storage
 import com.vishnurajeevan.libroabs.storage.models.AuthToken
 import com.vishnurajeevan.libroabs.storage.models.LibraryMetadata
@@ -36,7 +38,6 @@ import kotlinx.io.asSink
 import java.io.File
 import java.util.zip.ZipInputStream
 import kotlin.io.path.createDirectories
-import kotlin.io.path.div
 import kotlin.io.path.outputStream
 
 @Inject
@@ -119,7 +120,7 @@ class LibroApiHandler(
       val match = filenameRegex.find(contentDisposition)
 
       val filename = match?.groupValues?.getOrNull(1)?.replace("+", " ")
-      downloadFile(url, File(targetDirectory, filename!!),)
+      downloadFile(url, targetDirectory.resolveWithin(filename!!.toSafePathSegment()))
     }
   }
 
@@ -134,7 +135,7 @@ class LibroApiHandler(
         ZipInputStream(destinationFile.inputStream()).use { zipIn ->
           var entry = zipIn.nextEntry
           while (entry != null) {
-            val entryPath = targetDirectory.toPath() / entry.name
+            val entryPath = targetDirectory.resolveWithin(entry.name).toPath()
 
             if (entry.isDirectory) {
               // Create directory
@@ -173,7 +174,7 @@ class LibroApiHandler(
       if (!dryRun) {
         downloadFile(
           url = Url(downloadUrl.pdf_url),
-          destinationFile = File(targetDirectory, pdfExtra.filename),
+          destinationFile = targetDirectory.resolveWithin(pdfExtra.filename.toSafePathSegment()),
         )
       }
     }

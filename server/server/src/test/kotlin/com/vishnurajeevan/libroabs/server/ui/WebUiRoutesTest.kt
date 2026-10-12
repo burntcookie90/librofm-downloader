@@ -14,6 +14,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.parameters
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
@@ -442,6 +445,14 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun sessionCookieIsSecureBehindAnHttpsProxy() = ui(backend("pw")) {
+    val direct = browser().submitForm("/ui/login", parameters { append("password", "pw") })
+    assertFalse(direct.headers[HttpHeaders.SetCookie].orEmpty().contains("Secure"))
+    val proxied = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("X-Forwarded-Proto", "https") }
+    assertContains(proxied.headers[HttpHeaders.SetCookie].orEmpty(), "Secure")
+  }
+
+  @Test
   fun loginIgnoresOpenRedirects() = ui(backend("pw")) {
     val login = browser().submitForm("/ui/login", parameters {
       append("password", "pw")
@@ -456,6 +467,63 @@ class WebUiRoutesTest {
     assertEquals(HttpStatusCode.OK, client.get("/ui/queue") { header(HttpHeaders.Authorization, "Bearer pw") }.status)
     assertEquals(HttpStatusCode.OK, client.get("/ui/queue") { header("X-Api-Key", "pw") }.status)
     assertEquals(HttpStatusCode.Found, client.get("/ui/queue") { header(HttpHeaders.Authorization, "Bearer wrong") }.status)
+  }
+
+  @Test
+  fun repeatedWrongApiKeysLockOutPasswordsButNotSessions() = ui(backend("pw")) {
+    val client = browser()
+    assertEquals(HttpStatusCode.Found, client.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    val api = browser()
+    repeat(5) { api.get("/ui/queue") { header("X-Api-Key", "guess-$it") } }
+    assertEquals(HttpStatusCode.Found, api.get("/ui/queue") { header("X-Api-Key", "pw") }.status)
+    assertEquals(HttpStatusCode.TooManyRequests, api.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    // an existing session keeps working
+    assertEquals(HttpStatusCode.OK, client.get("/ui/queue").status)
+  }
+
+  @Test
+  fun apiRefusesRequestsMadeByOtherSites() = try {
+    testApplication {
+      application {
+        installWebUi(backend())
+        routing { get("/update") { call.respondText("updating") } }
+      }
+      val client = browser()
+      assertEquals(HttpStatusCode.OK, client.get("/update").status, "scripts send no fetch metadata")
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header("Sec-Fetch-Site", "none") }.status, "typed into the address bar")
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header("Sec-Fetch-Site", "same-origin") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header("Sec-Fetch-Site", "cross-site") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header("Sec-Fetch-Site", "same-site") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header(HttpHeaders.Origin, "https://evil.example") }.status)
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header(HttpHeaders.Origin, "http://localhost") }.status)
+      // links from other sites into the UI still work
+      assertEquals(HttpStatusCode.OK, client.get("/ui") { header("Sec-Fetch-Site", "cross-site") }.status)
+    }
+  } finally {
+    scope.cancel()
+  }
+
+  @Test
+  fun errorsDoNotRevealExceptionDetails() = try {
+    testApplication {
+      application {
+        installWebUi(backend())
+        routing { get("/ui/boom") { error("/secret/path/data.db is locked") } }
+      }
+      val page = browser().get("/ui/boom")
+      assertEquals(HttpStatusCode.InternalServerError, page.status)
+      assertFalse(page.bodyAsText().contains("/secret/path"))
+      val htmx = browser().htmxGet("/ui/boom")
+      assertFalse(htmx.headers["HX-Trigger"].orEmpty().contains("secret"))
+    }
+  } finally {
+    scope.cancel()
+  }
+
+  @Test
+  fun otherSitesCannotPostToTheLoginForm() = ui(backend("pw")) {
+    val response = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("Sec-Fetch-Site", "cross-site") }
+    assertEquals(HttpStatusCode.Forbidden, response.status)
   }
 
   @Test

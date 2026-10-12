@@ -3,7 +3,6 @@ package com.vishnurajeevan.libroabs.server
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import com.vishnurajeevan.libroabs.server.route.DownloadHistory
-import com.vishnurajeevan.libroabs.server.route.Info
 import com.vishnurajeevan.libroabs.server.route.RouteHandler
 import com.vishnurajeevan.libroabs.server.route.Update
 import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
@@ -62,11 +61,8 @@ fun setupServer(
         get<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
         delete<DownloadHistory.Isbn> { routeHandlerMap.handleRoute(it) }
 
+        // Unauthenticated uptime check; it must not reveal anything derived from the configuration.
         head("/") {
-          call.response.headers.append(
-            "App-Hash",
-            "${serverInfo.hashCode()}"
-          )
           call.respond("")
         }
         get("/") {

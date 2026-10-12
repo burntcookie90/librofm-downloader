@@ -37,7 +37,7 @@ A failing book no longer stops the rest of a sync: its error is recorded and you
 #### Protecting the web UI
 Set `WEBUI_PASSWORD` to require a password for the web UI. Sessions use a signed, HTTP-only cookie and last 30 days.
 The JSON endpoints below also require the password in that case, sent as `Authorization: Bearer <password>` or `X-Api-Key: <password>`
-(for example `curl -H "X-Api-Key: ..." http://host:8080/update`). Without a password, anyone who can reach the port has full access, so don't expose it directly to the internet.
+(for example `curl -H "X-Api-Key: ..." http://host:8080/update`). After 5 wrong passwords or API keys in 15 minutes, a client is locked out for the rest of that window. Behind a reverse proxy every client shares the proxy's address, so a lockout applies to everyone's password and API-key checks (existing sessions keep working). If the proxy terminates TLS, have it send `X-Forwarded-Proto: https` so the session cookie is marked `Secure`. Without a password, anyone who can reach the port has full access, so don't expose it directly to the internet.
 
 ### API Server
 Endpoints:
@@ -46,7 +46,6 @@ Endpoints:
 - `GET`: `/history` returns a json with your download history
 - `GET`: `/history/{isbn}` returns the single entry for an isbn
 - `DELETE`: `/history/{isbn}` deletes the history entry for an isbn
-- `GET`: `/info` returns the current configuration (credentials are never included)
 
 
 ----
