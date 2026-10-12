@@ -31,8 +31,8 @@ interface NetworkComponent {
         override fun log(message: String) {
           _logger.v(message)
         }
-
       }
+      sanitizeHeader { it == HttpHeaders.Authorization || serverInfo.libroFmHeaders.keys.any { key -> key.equals(it, ignoreCase = true) } }
       level = when (serverInfo.logLevel) {
         ApplicationLogLevel.NONE -> LogLevel.NONE
         ApplicationLogLevel.INFO -> LogLevel.INFO

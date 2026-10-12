@@ -1,6 +1,8 @@
 package com.vishnurajeevan.libroabs.models
 
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
+import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.models.server.redactForLog
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -16,8 +18,10 @@ interface Logger {
 @Inject
 @ContributesBinding(AppScope::class)
 class RealLogger(
-  private val applicationLogLevel: ApplicationLogLevel,
+  private val serverInfo: ServerInfo,
 ) : Logger {
+  private val applicationLogLevel: ApplicationLogLevel get() = serverInfo.logLevel
+
   override fun v(msg: String) {
     when (applicationLogLevel) {
       ApplicationLogLevel.VERBOSE -> log(msg)
@@ -34,6 +38,6 @@ class RealLogger(
 
   @OptIn(ExperimentalTime::class)
   private fun log(msg: String) {
-    println("${Clock.System.now()}: $msg")
+    println("${Clock.System.now()}: ${serverInfo.redactForLog(msg)}")
   }
 }
