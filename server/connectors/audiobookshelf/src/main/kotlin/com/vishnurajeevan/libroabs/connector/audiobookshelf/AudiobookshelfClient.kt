@@ -15,7 +15,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.http.ContentDisposition
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -54,8 +54,10 @@ class AudiobookshelfClient(
       validateResponse { response ->
         if (!response.status.isSuccess()) {
           val request = response.call.request
+          val reason = runCatching { response.bodyAsText() }.getOrDefault("").trim().take(200)
           throw AudiobookshelfException(
-            "Audiobookshelf answered HTTP ${response.status.value} to ${request.method.value} ${request.url.encodedPath}"
+            "Audiobookshelf answered HTTP ${response.status.value} to ${request.method.value} ${request.url.encodedPath}" +
+              if (reason.isNotEmpty() && !reason.startsWith("<")) ": $reason" else ""
           )
         }
       }
@@ -144,10 +146,8 @@ class AudiobookshelfClient(
     key,
     ChannelProvider(file.length()) { file.readChannel() },
     Headers.build {
-      append(
-        HttpHeaders.ContentDisposition,
-        ContentDisposition.File.withParameter(ContentDisposition.Parameters.FileName, file.name).toString(),
-      )
+      // Ktor adds `form-data; name=...` itself; anything but the filename here breaks the part for Audiobookshelf.
+      append(HttpHeaders.ContentDisposition, "filename=\"${file.name.replace("\"", "\\\"")}\"")
       append(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
     },
   )

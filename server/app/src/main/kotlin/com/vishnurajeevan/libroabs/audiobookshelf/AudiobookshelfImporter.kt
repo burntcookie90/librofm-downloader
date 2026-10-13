@@ -78,7 +78,9 @@ class AudiobookshelfImporter(
     if (book.cover_url.isBlank()) return
     try {
       withContext(ioDispatcher) {
-        downloadClient.downloadTo(Url(book.cover_url), File(directory, AudiobookshelfSync.COVER), RetryPolicy(attempts = 3))
+        // libro.fm hands out protocol-relative cover links.
+        val url = if (book.cover_url.startsWith("//")) "https:${book.cover_url}" else book.cover_url
+        downloadClient.downloadTo(Url(url), File(directory, AudiobookshelfSync.COVER), RetryPolicy(attempts = 3))
       }
     } catch (e: CancellationException) {
       throw e
