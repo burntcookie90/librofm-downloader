@@ -269,6 +269,8 @@ fun FlowContent.settingsPage(info: ServerInfo) {
       "Tracker sync mode" to trackerModeLabel(info.hardcoverSyncMode),
       "Skipped ISBNs" to info.skipTrackingIsbns.joinToString(", ").ifEmpty { "None" },
       "Health check" to if (info.healthCheckId.isNullOrEmpty()) "Disabled" else "${info.healthCheckHost}/…",
+      "Audiobookshelf" to (info.audiobookshelf?.let { "${it.url.substringAfter("://").substringBefore('/')} (${it.mode.name.lowercase()})" }
+        ?: if (info.writesAbsMetadataFiles) "Metadata files only" else "Disabled"),
       "Webhooks" to (info.webhookUrls.joinToString(", ") { it.substringAfter("://").substringBefore('/') }.ifEmpty { "None" }),
     )
     settingsCard(

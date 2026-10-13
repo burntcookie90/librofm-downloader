@@ -23,6 +23,7 @@ dependencies {
   implementation(project(":server:connectors:tracker:hardcover"))
   implementation(project(":server:connectors:healthcheck:hcio"))
   implementation(project(":server:connectors:webhook"))
+  implementation(project(":server:connectors:audiobookshelf"))
   implementation(project(":server:connectors:converter:ffmpeg"))
   implementation(project(":server:storage:json"))
   implementation(project(":server:storage:db"))

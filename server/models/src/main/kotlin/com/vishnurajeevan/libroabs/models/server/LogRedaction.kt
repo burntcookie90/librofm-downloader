@@ -13,5 +13,6 @@ fun ServerInfo.redactForLog(message: String): String {
   var redacted = message
   webhookUrls.filter { it.isNotEmpty() }.forEach { redacted = redacted.replace(it, "${it.substringBefore("://")}://${webhookHost(it)}/…") }
   healthCheckId?.takeIf { it.isNotEmpty() }?.let { redacted = redacted.replace(it, "…") }
+  audiobookshelf?.apiKey?.takeIf { it.isNotEmpty() }?.let { redacted = redacted.replace(it, "…") }
   return redacted.replace(urlQuery, "$1?…")
 }

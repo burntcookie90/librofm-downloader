@@ -62,6 +62,7 @@ class DownloadServiceTest {
   private val converter = FakeConverter()
   private val writer = FakeWriter()
   private val attempts = FakeAttempts()
+  private val importer = FakeImporter()
 
   private fun info(format: BookFormat = BookFormat.M4B_MP3_FALLBACK, extras: Boolean = false, renameChapters: Boolean = false) = ServerInfo(
     libroUserName = "u", libroPassword = "p", port = 0, dataDir = "", mediaDir = tmp.path, syncInterval = "d", parallelCount = 1,
@@ -85,6 +86,7 @@ class DownloadServiceTest {
     attemptRepo = attempts,
     dbWriter = writer,
     targetDir = { File(tmp, it.isbn) },
+    importer = importer,
   )
 
   private fun book(isbn: String, title: String = "Book $isbn") = testBook(isbn, title)
@@ -278,6 +280,23 @@ class DownloadServiceTest {
     assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
     val attempt = attempts.get(r.attemptId)!!
     assertTrue(attempt.error!!.contains("extras failed"), attempt.error)
+    assertEquals(1, writer.writes.filterIsInstance<DownloadItem>().size)
+  }
+
+  @Test
+  fun downloadedBooksAreImported() = await {
+    val r = service().enqueue(book("12"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(listOf("12"), importer.imported)
+  }
+
+  @Test
+  fun anImportFailureDoesNotFailTheBook() = await {
+    importer.failWith = java.io.IOException("Audiobookshelf answered HTTP 502")
+    val r = service().enqueue(book("13"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    val error = attempts.get(r.attemptId)!!.error!!
+    assertTrue(error.startsWith("Book downloaded, but adding it to Audiobookshelf failed"), error)
     assertEquals(1, writer.writes.filterIsInstance<DownloadItem>().size)
   }
 
