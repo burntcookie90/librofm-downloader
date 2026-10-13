@@ -15,7 +15,7 @@ ktorfit = "2.7.5"
 metro = "1.4.5"
 logback = "1.6.5"
 redacted = "1.18.0"
-sqldelight = "2.3.2"
+sqldelight = "2.4.1"
 
 jdk = "21"
 jvmTarget = "21"
