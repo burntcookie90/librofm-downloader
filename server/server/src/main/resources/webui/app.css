@@ -269,6 +269,18 @@ details.err pre { margin: 6px 0 0; padding: 10px; border-radius: 8px; background
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 #library-results.htmx-request { opacity: 0.6; }
 
+/* ---- audiobookshelf comparison ---- */
+.diff { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 8px 0 12px; table-layout: fixed; }
+.diff th, .diff td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.diff thead th { color: var(--muted); font-weight: 600; font-size: 0.8rem; border-top: 0; }
+.diff tbody th { color: var(--muted); font-weight: 600; width: 7.5em; }
+.diff td.before { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+.diff td.after { color: var(--text); background: var(--ok-soft); border-radius: 4px; }
+.cover-compare { display: flex; gap: 16px; margin: 4px 0 12px; }
+.cover-compare figure { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.cover-compare .cover { width: 96px; }
+details > summary { cursor: pointer; padding: 4px 0; }
+
 /* ---- tablet / desktop ---- */
 @media (min-width: 640px) {
   .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }

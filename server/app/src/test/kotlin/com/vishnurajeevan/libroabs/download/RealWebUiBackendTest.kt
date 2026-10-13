@@ -62,6 +62,13 @@ class RealWebUiBackendTest {
     dbWriter = writer,
     libroWishlistRepo = FakeWishlist(mapOf("111" to true)),
     trackerWishlistRepo = FakeWishlist(mapOf("222" to false)),
+    absMetadataSync = object : com.vishnurajeevan.libroabs.audiobookshelf.AbsMetadataSync {
+      override val enabled = false
+      override suspend fun plan(book: com.vishnurajeevan.libroabs.models.libro.Book, downloadDir: File?) = error("unused")
+      override suspend fun planAll(books: List<Pair<com.vishnurajeevan.libroabs.models.libro.Book, File?>>) = error("unused")
+      override suspend fun apply(book: com.vishnurajeevan.libroabs.models.libro.Book, downloadDir: File?, itemId: String, fields: Set<String>?, replaceCover: Boolean) = error("unused")
+      override suspend fun cover(itemId: String) = null
+    },
   )
 
   @AfterTest

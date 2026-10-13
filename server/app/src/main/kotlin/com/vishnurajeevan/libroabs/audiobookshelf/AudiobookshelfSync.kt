@@ -1,6 +1,7 @@
 package com.vishnurajeevan.libroabs.audiobookshelf
 
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsBookMetadata
+import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsField
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsFolder
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsLibrary
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsLibraryItem
@@ -36,16 +37,53 @@ class AudiobookshelfSync(
   private val targetLock = Mutex()
   private var target: Target? = null
 
+  /** Adds the book in [directory] to Audiobookshelf, then gives it [metadata], its cover and [chapterTitles]. */
   suspend fun add(metadata: AbsBookMetadata, directory: File, chapterTitles: List<String>?): AbsLibraryItem {
     val target = target()
     val item = when (config.mode) {
       AbsImportMode.SHARED -> addShared(target, metadata, directory.canonicalFile)
       AbsImportMode.UPLOAD -> addByUpload(target, metadata, directory)
     }
-    client.updateMetadata(item.id, metadata)
-    File(directory, COVER).takeIf { it.isFile }?.let { client.uploadCover(item.id, it) }
-    if (chapterTitles != null) nameChapters(item, chapterTitles)
-    return item
+    return applyTo(item.id, metadata, AbsField.entries.toSet(), File(directory, COVER).takeIf { it.isFile }, chapterTitles)
+  }
+
+  /**
+   * Gives an item that is already in Audiobookshelf the [fields] of [metadata], [cover] and libro.fm's chapter names
+   * (keeping Audiobookshelf's timings). Returns the item as it is afterwards.
+   */
+  suspend fun applyTo(
+    itemId: String,
+    metadata: AbsBookMetadata,
+    fields: Set<AbsField>,
+    cover: File?,
+    chapterTitles: List<String>?,
+  ): AbsLibraryItem {
+    if (fields.isNotEmpty()) client.updateMetadata(itemId, metadata, fields)
+    cover?.let { client.uploadCover(itemId, it) }
+    val item = client.item(itemId)
+    val chapters = item.media.chapters
+    if (chapterTitles == null) return item
+    if (chapters.size != chapterTitles.size) {
+      logger.v("Leaving chapter names alone: Audiobookshelf has ${chapters.size} chapters, libro.fm ${chapterTitles.size}")
+      return item
+    }
+    val renamed = chapters.mapIndexed { index, chapter -> chapter.copy(title = chapterTitles[index]) }
+    if (renamed == chapters) return item
+    client.updateChapters(itemId, renamed)
+    return item.copy(media = item.media.copy(chapters = renamed))
+  }
+
+  suspend fun allItems(): List<AbsLibraryItem> = client.allItems(target().library.id)
+
+  suspend fun item(itemId: String): AbsLibraryItem = client.item(itemId)
+
+  suspend fun cover(itemId: String): Pair<ByteArray, String> = client.cover(itemId)
+
+  /** Where Audiobookshelf sees [directory]; only known when it shares the media folder. */
+  suspend fun absPathFor(directory: File): String? {
+    if (config.mode != AbsImportMode.SHARED) return null
+    val relative = directory.canonicalFile.relativeToOrNull(mediaDir)?.invariantSeparatorsPath ?: return null
+    return "${target().mediaRoot.trimEnd('/')}/$relative"
   }
 
   private suspend fun addShared(target: Target, metadata: AbsBookMetadata, directory: File): AbsLibraryItem {
@@ -129,16 +167,6 @@ class AudiobookshelfSync(
       client.search(libraryId, query).firstOrNull(matches)?.let { return it }
     }
     return null
-  }
-
-  /** libro.fm's chapter names replace Audiobookshelf's "Track 001"s, keeping its timings. */
-  private suspend fun nameChapters(item: AbsLibraryItem, titles: List<String>) {
-    val chapters = client.item(item.id).media.chapters
-    if (chapters.size != titles.size) {
-      logger.v("Leaving chapter names alone: Audiobookshelf has ${chapters.size} chapters, libro.fm ${titles.size}")
-      return
-    }
-    client.updateChapters(item.id, chapters.mapIndexed { index, chapter -> chapter.copy(title = titles[index]) })
   }
 
   private suspend fun target(): Target = targetLock.withLock {

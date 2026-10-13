@@ -95,6 +95,28 @@ class AudiobookshelfClient(
       parameter("limit", limit)
     }.body<ItemsResponse>().results
 
+  /** Every item in the library, a page at a time. */
+  suspend fun allItems(libraryId: String, pageSize: Int = 100): List<AbsLibraryItem> {
+    val items = mutableListOf<AbsLibraryItem>()
+    var page = 0
+    while (true) {
+      val response = http.get("$api/libraries/$libraryId/items") {
+        auth()
+        parameter("limit", pageSize)
+        parameter("page", page)
+      }.body<ItemsResponse>()
+      items += response.results
+      if (response.results.isEmpty() || items.size >= response.total) return items
+      page++
+    }
+  }
+
+  /** The item's cover image and its content type. Fails when it has none. */
+  suspend fun cover(itemId: String): Pair<ByteArray, String> {
+    val response = http.get("$api/items/$itemId/cover") { auth() }
+    return response.body<ByteArray>() to (response.headers[HttpHeaders.ContentType] ?: "image/jpeg")
+  }
+
   suspend fun search(libraryId: String, query: String, limit: Int = 25): List<AbsLibraryItem> =
     http.get("$api/libraries/$libraryId/search") {
       auth()
@@ -105,8 +127,8 @@ class AudiobookshelfClient(
   suspend fun item(itemId: String): AbsLibraryItem =
     http.get("$api/items/$itemId") { auth(); parameter("expanded", 1) }.body()
 
-  suspend fun updateMetadata(itemId: String, metadata: AbsBookMetadata) {
-    http.patch("$api/items/$itemId/media") { auth(); json(metadata.toMediaUpdate()) }
+  suspend fun updateMetadata(itemId: String, metadata: AbsBookMetadata, fields: Set<AbsField> = AbsField.entries.toSet()) {
+    http.patch("$api/items/$itemId/media") { auth(); json(metadata.toMediaUpdate(fields)) }
   }
 
   suspend fun uploadCover(itemId: String, cover: File) {
