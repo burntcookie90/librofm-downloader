@@ -31,7 +31,13 @@ data class ServerInfo(
   val libroFmHeaders: Map<String, String> = emptyMap(),
   /** When set, the web UI and API require this password. */
   @Redacted val webUiPassword: String? = null,
+  /** Adds every downloaded book to Audiobookshelf when set. */
+  val audiobookshelf: AudiobookshelfConfig? = null,
+  /** Writes `metadata.json` and `cover.jpg` next to each book even without [audiobookshelf]. */
+  val writeAbsMetadata: Boolean = false,
 ) {
+  val writesAbsMetadataFiles: Boolean get() = writeAbsMetadata || audiobookshelf != null
+
   fun prettyPrint(): String {
     return """
       |Server Info:
@@ -54,6 +60,8 @@ data class ServerInfo(
       |  Webhooks: ${webhookUrls.map(::webhookHost)}
       |  LibroFM Headers: ${libroFmHeaders.keys}
       |  Web UI Password Protected: ${!webUiPassword.isNullOrEmpty()}
+      |  Audiobookshelf: ${audiobookshelf?.let { "${webhookHost(it.url)} (${it.mode})" } ?: "Disabled"}
+      |  Audiobookshelf Metadata Files: $writesAbsMetadataFiles
     """.trimMargin()
   }
 }

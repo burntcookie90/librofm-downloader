@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.download
 
+import com.vishnurajeevan.libroabs.audiobookshelf.LibraryImporter
 import com.vishnurajeevan.libroabs.converter.ffmpeg.M4bConverter
 import com.vishnurajeevan.libroabs.db.repo.DownloadAttemptRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
@@ -39,6 +40,8 @@ import kotlinx.coroutines.withContext
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class EnqueueResult(
@@ -67,6 +70,7 @@ class DownloadService(
   private val attemptRepo: DownloadAttemptRepo,
   private val dbWriter: DbWriter,
   private val targetDir: (Book) -> File,
+  private val importer: LibraryImporter,
 ) {
   private class Running(val attemptId: Long, val job: Job, val result: CompletableDeferred<AttemptStatus>)
 
@@ -124,7 +128,7 @@ class DownloadService(
     var error: String? = null
     var downloaded: DownloadedFormat? = null
     try {
-      processingSemaphore.withPermit {
+      val dir = processingSemaphore.withPermit {
         attemptRepo.markRunning(attemptId, System.currentTimeMillis())
         lfdLogger.v("Downloading ${book.title}")
         val dir = targetDir(book).also { it.mkdirs() }
@@ -142,6 +146,20 @@ class DownloadService(
           } catch (e: Exception) {
             error = "Book downloaded, but extras failed: ${e.describe()}"
           }
+        }
+        dir
+      }
+      // Outside the download slot: waiting on Audiobookshelf shouldn't hold up the next book.
+      if (importer.enabled) {
+        try {
+          steps[attemptId] = "Adding to Audiobookshelf"
+          importer.import(book, dir)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          val failure = "Book downloaded, but adding it to Audiobookshelf failed: ${e.describe()}"
+          lfdLogger.i("${book.title}: $failure")
+          error = listOfNotNull(error, failure).joinToString("; ")
         }
       }
       status = AttemptStatus.SUCCEEDED
@@ -331,7 +349,7 @@ class DownloadService(
       .forEachIndexed({ index, file ->
         val newFilename = newFilenames[index]
         val newFile = File(targetDirectory, "$newFilename.${file.extension}")
-        file.renameTo(newFile)
+        Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
 
         if (writeTitleTag) {
           val audioFile = AudioFileIO.read(newFile)

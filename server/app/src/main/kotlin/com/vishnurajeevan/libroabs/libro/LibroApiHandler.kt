@@ -26,12 +26,12 @@ import dev.zacsweers.metro.binding
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.io.RawSink
-import kotlinx.io.asSink
 import java.io.File
+import java.io.IOException
 
 @Inject
 @ContributesBinding(AppScope::class, binding = binding<LibroFmBooks>())
@@ -112,10 +112,13 @@ class LibroApiHandler(
 
   override suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
     val response = authorized { libroAPI.fetchM4BMetadata(it, isbn) }
-    return if (response.isSuccessful) {
-      Result.success(response.body()!!)
-    } else {
-      Result.failure(Exception("M4B Not Found!"))
+    val m4b = response.body()?.takeIf { response.isSuccessful && it.m4b_url.isNotBlank() }
+    return when {
+      m4b != null -> Result.success(m4b)
+      // An outage must not look like "this book has no M4B", or the book quietly falls back to MP3s.
+      response.code == 429 || response.code >= 500 ->
+        throw IOException("libro.fm answered HTTP ${response.code} when asked for the M4B of $isbn")
+      else -> Result.failure(Exception("M4B Not Found!"))
     }
   }
 
@@ -129,15 +132,24 @@ class LibroApiHandler(
 
   override suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File): List<File> {
     if (dryRun) return emptyList()
-    return data.flatMapIndexed { index, part ->
-      lfdLogger.v("downloading part ${index + 1}")
-      val zip = File(targetDirectory, "part-$index.zip")
-      try {
-        downloadFile(Url(part.url), zip)
-        withContext(ioDispatcher) { extractZip(zip, targetDirectory) }
-      } finally {
-        zip.delete()
+    // Everything is unpacked aside first, so a part that fails leaves neither a half-extracted book nor a mix of old
+    // and new files in the book's folder.
+    val staging = File(targetDirectory, ".libro-download")
+    return try {
+      withContext(ioDispatcher) { staging.deleteRecursively(); staging.mkdirs() }
+      val extracted = data.flatMapIndexed { index, part ->
+        lfdLogger.v("downloading part ${index + 1} of ${data.size}")
+        val zip = File(staging, "part-$index.zip")
+        try {
+          downloadFile(Url(part.url), zip)
+          withContext(ioDispatcher) { extractZip(zip, File(staging, "files")) }
+        } finally {
+          zip.delete()
+        }
       }
+      withContext(ioDispatcher) { moveInto(File(staging, "files"), extracted, targetDirectory) }
+    } finally {
+      withContext(NonCancellable + ioDispatcher) { staging.deleteRecursively() }
     }
   }
 

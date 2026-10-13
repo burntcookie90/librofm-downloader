@@ -165,3 +165,14 @@ internal class FakeAttempts : DownloadAttemptRepo {
 
   override suspend fun deleteFinished(id: Long) = rows.removeIf { it.id == id && !it.status.isActive }
 }
+
+internal class FakeImporter : com.vishnurajeevan.libroabs.audiobookshelf.LibraryImporter {
+  override var enabled = true
+  @Volatile var failWith: Throwable? = null
+  val imported = CopyOnWriteArrayList<String>()
+
+  override suspend fun import(book: Book, directory: File) {
+    failWith?.let { throw it }
+    imported += book.isbn
+  }
+}

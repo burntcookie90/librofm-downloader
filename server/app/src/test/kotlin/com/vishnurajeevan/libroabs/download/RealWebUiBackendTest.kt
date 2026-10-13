@@ -50,7 +50,7 @@ class RealWebUiBackendTest {
   )
   private val sync = SyncController(scope, logger)
   private val downloads = DownloadService(
-    info, FakeConverter(), libro, scope, Dispatchers.IO, Semaphore(2), logger, attempts, writer, { File(tmp, it.isbn) },
+    info, FakeConverter(), libro, scope, Dispatchers.IO, Semaphore(2), logger, attempts, writer, { File(tmp, it.isbn) }, FakeImporter(),
   )
   private val backend = RealWebUiBackend(
     serverInfo = info,
