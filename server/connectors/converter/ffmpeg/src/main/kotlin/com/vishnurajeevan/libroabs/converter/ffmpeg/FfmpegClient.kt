@@ -68,6 +68,7 @@ class FfmpegClient(
       .addExtraArgs("-i", listFile.absolutePath)
       .addExtraArgs("-f", "ffmetadata", "-i", metadataFile.absolutePath)
       .addInput(coverFile.absolutePath)
+      .done()
       .addOutput(newFile.absolutePath)
       .setAudioCodec("aac")
       .addExtraArgs("-b:a", audioQuality)
