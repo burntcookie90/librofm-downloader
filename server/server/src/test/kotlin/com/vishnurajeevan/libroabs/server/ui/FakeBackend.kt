@@ -238,4 +238,22 @@ class FakeBackend(
     trackerEnabled = true,
     trackerSynced = mapOf("9783333333333" to true),
   )
+
+  // ---- audiobookshelf ----
+  @Volatile var absEnabled = false
+  @Volatile var absPlans: (String) -> AbsPlanResult = { AbsPlanResult.NotInAudiobookshelf }
+  @Volatile var absOverviewResult = AbsSyncOverview(emptyList(), 0, emptyList())
+  @Volatile var absApplyError: String? = null
+  data class AbsApplied(val isbn: String, val itemId: String, val fields: Set<String>?, val cover: Boolean)
+  val absApplied = CopyOnWriteArrayList<AbsApplied>()
+  override val absFields = listOf("NARRATORS" to "Narrators", "SERIES" to "Series", "CHAPTERS" to "Chapter names")
+
+  override val audiobookshelfEnabled: Boolean get() = absEnabled
+  override suspend fun absPlan(isbn: String) = absPlans(isbn)
+  override suspend fun absPlanAll() = absOverviewResult
+  override suspend fun absApply(isbn: String, itemId: String, fields: Set<String>?, replaceCover: Boolean): String? {
+    absApplied += AbsApplied(isbn, itemId, fields, replaceCover)
+    return absApplyError
+  }
+  override suspend fun absCover(itemId: String) = if (itemId == "item-1") "jpeg".toByteArray() to "image/jpeg" else null
 }

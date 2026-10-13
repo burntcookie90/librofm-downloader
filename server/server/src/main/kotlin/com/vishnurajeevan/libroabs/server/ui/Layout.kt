@@ -33,7 +33,7 @@ enum class NavItem(val path: String, val label: String, val icon: Icon) {
   SETTINGS("/ui/settings", "Settings", Icon.SETTINGS),
 }
 
-private const val ASSET_VERSION = "1"
+private const val ASSET_VERSION = "2"
 
 private fun HEAD.assets(pageTitle: String) {
   meta(charset = "utf-8")
