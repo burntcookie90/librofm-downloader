@@ -96,6 +96,55 @@ data class AbsSyncOverview(
   val errors: List<String> = emptyList(),
 )
 
+/** One change to make on Hardcover (or the libro.fm wishlist). [key] identifies it when choosing what to apply. */
+data class HardcoverAction(
+  val key: String,
+  val description: String,
+  /** Whether it is ticked to begin with, which is also whether the automatic sync would do it. */
+  val selected: Boolean = true,
+  /** Why it isn't ticked, or anything else worth knowing before applying it. */
+  val note: String? = null,
+)
+
+/** The Hardcover book a libro.fm book was matched to. */
+data class HardcoverMatch(
+  val title: String,
+  val url: String?,
+  /** "ISBN", or how the title search matched. */
+  val matchedBy: String,
+  /** Hardcover has no edition with this ISBN yet; applying adds one. */
+  val createsEdition: Boolean,
+)
+
+data class HardcoverBookPlan(
+  val isbn: String,
+  val title: String,
+  val author: String?,
+  val match: HardcoverMatch?,
+  val actions: List<HardcoverAction>,
+)
+
+data class HardcoverOverview(
+  /** Identifies this preview, so applying does exactly what was shown. */
+  val planId: String,
+  val books: List<HardcoverBookPlan>,
+  val upToDate: Int,
+  /** Titles Hardcover doesn't seem to have. */
+  val notFound: List<String>,
+  val errors: List<String> = emptyList(),
+  /** Audiobookshelf is configured, so listening progress is compared. */
+  val progressCompared: Boolean = false,
+  /** HARDCOVER_SYNC_PROGRESS is on. */
+  val progressSyncedAutomatically: Boolean = false,
+)
+
+data class HardcoverApplyResult(
+  val applied: Int,
+  val failures: List<Pair<String, String>>,
+  /** The preview was too old to apply; compare again. */
+  val expired: Boolean = false,
+)
+
 /**
  * Everything the web UI needs from the rest of the application.
  */
@@ -154,6 +203,16 @@ interface WebUiBackend {
 
   /** An Audiobookshelf item's current cover and its content type. */
   suspend fun absCover(itemId: String): Pair<ByteArray, String>? = null
+
+  /** Whether HARDCOVER_TOKEN is set. */
+  val hardcoverEnabled: Boolean get() = false
+
+  /** Works out what syncing with Hardcover would change. Changes nothing. */
+  suspend fun hardcoverPlan(): HardcoverOverview = HardcoverOverview("", emptyList(), 0, emptyList())
+
+  /** Applies the actions with these keys from the preview [planId]. */
+  suspend fun hardcoverApply(planId: String, keys: Set<String>): HardcoverApplyResult =
+    HardcoverApplyResult(0, emptyList(), expired = true)
 
   fun syncSnapshot(): SyncSnapshot
   fun requestSync(overwrite: Boolean): Boolean

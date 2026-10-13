@@ -83,6 +83,22 @@ data class AbsChapter(
   val title: String,
 )
 
+/** How far the API key's user has listened to an item. Times are seconds; dates are epoch milliseconds. */
+@Serializable
+data class AbsMediaProgress(
+  val libraryItemId: String,
+  val episodeId: String? = null,
+  val duration: Double = 0.0,
+  val currentTime: Double = 0.0,
+  val isFinished: Boolean = false,
+  val startedAt: Long? = null,
+  val finishedAt: Long? = null,
+  val lastUpdate: Long? = null,
+)
+
+@Serializable
+internal data class MeResponse(val mediaProgress: List<AbsMediaProgress> = emptyList())
+
 @Serializable
 internal data class LibrariesResponse(val libraries: List<AbsLibrary>)
 

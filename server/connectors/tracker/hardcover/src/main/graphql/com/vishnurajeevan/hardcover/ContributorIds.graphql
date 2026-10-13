@@ -1,0 +1,11 @@
+# Several people can share a name; the most followed is the likeliest.
+query ContributorIds($names: [String!]!, $publishers: [String!]!) {
+  authors(where: {name: {_in: $names}}, order_by: {users_count: desc}) {
+    id
+    name
+  }
+  publishers(where: {name: {_in: $publishers}}, order_by: {editions_count: desc}) {
+    id
+    name
+  }
+}

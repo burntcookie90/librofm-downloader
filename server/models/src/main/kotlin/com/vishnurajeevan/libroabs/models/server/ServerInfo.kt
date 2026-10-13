@@ -35,6 +35,8 @@ data class ServerInfo(
   val audiobookshelf: AudiobookshelfConfig? = null,
   /** Writes `metadata.json` and `cover.jpg` next to each book even without [audiobookshelf]. */
   val writeAbsMetadata: Boolean = false,
+  /** Sends Audiobookshelf listening progress to Hardcover on every sync. */
+  val hardcoverSyncProgress: Boolean = false,
 ) {
   val writesAbsMetadataFiles: Boolean get() = writeAbsMetadata || audiobookshelf != null
 
@@ -57,6 +59,7 @@ data class ServerInfo(
       |  Health Check: ${if (healthCheckId.isNullOrEmpty()) "Disabled" else "Enabled"}
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
+      |  Tracker progress sync: $hardcoverSyncProgress
       |  Webhooks: ${webhookUrls.map(::webhookHost)}
       |  LibroFM Headers: ${libroFmHeaders.keys}
       |  Web UI Password Protected: ${!webUiPassword.isNullOrEmpty()}

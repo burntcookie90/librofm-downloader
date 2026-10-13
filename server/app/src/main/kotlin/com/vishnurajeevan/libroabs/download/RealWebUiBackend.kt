@@ -25,6 +25,9 @@ import com.vishnurajeevan.libroabs.server.ui.ActiveAttempt
 import com.vishnurajeevan.libroabs.server.ui.BookState
 import com.vishnurajeevan.libroabs.server.ui.DashboardStats
 import com.vishnurajeevan.libroabs.server.ui.EnqueueOutcome
+import com.vishnurajeevan.libroabs.server.ui.HardcoverApplyResult
+import com.vishnurajeevan.libroabs.server.ui.HardcoverOverview
+import com.vishnurajeevan.libroabs.tracker.HardcoverSync
 import com.vishnurajeevan.libroabs.server.ui.LibraryEntry
 import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
 import com.vishnurajeevan.libroabs.server.ui.WishlistOverview
@@ -48,7 +51,15 @@ class RealWebUiBackend(
   private val libroWishlistRepo: LibroFmWishlistSyncStatusRepo,
   private val trackerWishlistRepo: TrackerWishlistSyncStatusRepo,
   private val absMetadataSync: AbsMetadataSync,
+  private val hardcoverSync: HardcoverSync,
 ) : WebUiBackend {
+
+  override val hardcoverEnabled: Boolean get() = hardcoverSync.enabled
+
+  override suspend fun hardcoverPlan(): HardcoverOverview = hardcoverSync.preview()
+
+  override suspend fun hardcoverApply(planId: String, keys: Set<String>): HardcoverApplyResult =
+    hardcoverSync.apply(planId, keys)
 
   override val audiobookshelfEnabled: Boolean get() = serverInfo.audiobookshelf != null
 

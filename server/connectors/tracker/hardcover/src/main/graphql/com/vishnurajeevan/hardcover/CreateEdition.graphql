@@ -3,7 +3,9 @@ mutation CreateEdition(
   $title: String!,
   $isbn_13: String!,
   $release_date: date,
-  $contributions: [ContributionInputType!]!) {
+  $contributions: [ContributionInputType!]!,
+  $audio_seconds: Int,
+  $publisher_id: Int) {
   insert_edition(
     book_id: $book_id,
     edition: {
@@ -17,6 +19,8 @@ mutation CreateEdition(
         edition_information: "Libro.fm",
         contributions: $contributions,
         release_date: $release_date,
+        audio_seconds: $audio_seconds,
+        publisher_id: $publisher_id,
       } }) {
     id
     errors

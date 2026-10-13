@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import kotlin.time.Instant
 
 /** Hands a freshly downloaded book over to the library it is listened from. */
 interface LibraryImporter {
@@ -63,9 +64,29 @@ interface AbsMetadataSync {
   suspend fun cover(itemId: String): Pair<ByteArray, String>?
 }
 
+/** How far into a book the user is, as Audiobookshelf reports it. */
+data class ListeningProgress(
+  val currentSeconds: Int,
+  val durationSeconds: Int,
+  val finished: Boolean,
+  val startedAt: Instant?,
+  val finishedAt: Instant?,
+  val lastUpdate: Instant?,
+)
+
+/** Where the user's listening progress comes from. */
+interface ListeningProgressSource {
+  /** Whether progress can be read at all. */
+  val progressAvailable: Boolean
+
+  /** Progress for each of [books] that has been started, by ISBN. [books] pairs each book with its download folder. */
+  suspend fun progress(books: List<Pair<Book, File?>>): Map<String, ListeningProgress>
+}
+
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, binding = binding<LibraryImporter>())
+@ContributesBinding(AppScope::class, binding = binding<ListeningProgressSource>())
 @ContributesBinding(AppScope::class, binding = binding<AbsMetadataSync>())
 class AudiobookshelfImporter(
   private val serverInfo: ServerInfo,
@@ -74,12 +95,34 @@ class AudiobookshelfImporter(
   private val libroClient: LibroFmBooks,
   private val lfdLogger: Logger,
   @Io private val ioDispatcher: CoroutineDispatcher,
-) : LibraryImporter, AbsMetadataSync {
+) : LibraryImporter, AbsMetadataSync, ListeningProgressSource {
   private val sync = serverInfo.audiobookshelf?.let {
     AudiobookshelfSync(AudiobookshelfClient(httpClient, it.url, it.apiKey), it, File(serverInfo.mediaDir), lfdLogger)
   }
 
   override val enabled: Boolean get() = serverInfo.writesAbsMetadataFiles && !serverInfo.dryRun
+
+  override val progressAvailable: Boolean get() = sync != null
+
+  override suspend fun progress(books: List<Pair<Book, File?>>): Map<String, ListeningProgress> {
+    val sync = sync ?: return emptyMap()
+    val items = sync.allItems()
+    // Podcast episodes have their own entries; only whole items are books.
+    val byItem = sync.mediaProgress().filter { it.episodeId == null }.associateBy { it.libraryItemId }
+    return books.mapNotNull { (book, dir) ->
+      val (item, _) = matchItem(book, items, dir?.let { sync.absPathFor(it) }) ?: return@mapNotNull null
+      val progress = byItem[item.id] ?: return@mapNotNull null
+      if (!progress.isFinished && progress.currentTime <= 0) return@mapNotNull null
+      book.isbn to ListeningProgress(
+        currentSeconds = progress.currentTime.toInt(),
+        durationSeconds = progress.duration.toInt(),
+        finished = progress.isFinished,
+        startedAt = progress.startedAt?.let(Instant::fromEpochMilliseconds),
+        finishedAt = progress.finishedAt?.let(Instant::fromEpochMilliseconds),
+        lastUpdate = progress.lastUpdate?.let(Instant::fromEpochMilliseconds),
+      )
+    }.toMap()
+  }
 
   override suspend fun import(book: Book, directory: File) {
     if (!enabled) return

@@ -83,10 +83,27 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
 ```
 
 Set `HARDCOVER_TOKEN` to the token from [hardcover.app/account/api](https://hardcover.app/account/api) (with or without
-its `Bearer ` prefix). Requests are kept under Hardcover's limit of 60 a minute, so a first sync of a large library takes
-a few minutes. A book that fails is logged and reported in the sync status without stopping the others; a rejected token
-or the daily limit stops the Hardcover sync until the next run. With `DRY_RUN=true`, Hardcover is read but only the
-changes it would make are logged.
+its `Bearer ` prefix).
+
+Books are matched by ISBN. When Hardcover has the book but not libro.fm's audiobook edition, it is found by title and
+author (subtitles, punctuation and a leading "The" don't matter, but the author must match) and the audiobook edition
+is added to it, with its narrators, length and publisher. Books Hardcover doesn't seem to have are listed rather than
+guessed at.
+
+**Preview.** The Sync page links to a Hardcover preview showing every change a sync would make, including which
+Hardcover book each title was matched to. Untick anything you don't want and apply the rest.
+
+**Listening progress.** With Audiobookshelf configured, the preview also shows your listening progress for libro.fm
+books: books you're partway through become Currently Reading with their progress, and finished ones become Read with
+the date you finished. Hardcover is never moved backwards, and a status you chose there (Paused, Did Not Finish,
+Ignored) is left alone. Books not played for a month are left unticked, as they may have been abandoned. Set
+`HARDCOVER_SYNC_PROGRESS=true` to send progress on every sync; only listening from then on is sent automatically, and
+earlier progress can be sent from the preview. Progress comes from the Audiobookshelf user that `ABS_API_KEY` belongs to.
+
+Requests are kept under Hardcover's limit of 60 a minute, so a first sync of a large library takes a few minutes. A book
+that fails is logged and reported in the sync status without stopping the others; a rejected token or the daily limit
+stops the Hardcover sync until the next run. With `DRY_RUN=true`, Hardcover is read but only the changes it would make
+are logged.
 
 ### Audiobookshelf
 
@@ -152,6 +169,7 @@ services:
       - RENAME_CHAPTERS=true #renames downloaded files with the chapter name provided by libro.fm
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
       - HARDCOVER_TOKEN=<>
+      - HARDCOVER_SYNC_PROGRESS=true #sends Audiobookshelf listening progress to Hardcover
       - SKIP_TRACKING_ISBNS=<>
       - HEALTHCHECK_ID=<>
       - ABS_URL=http://audiobookshelf:80
