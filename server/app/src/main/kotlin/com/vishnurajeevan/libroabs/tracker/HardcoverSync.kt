@@ -72,6 +72,7 @@ class HardcoverSync(
 
   /** Title searches are slow and rate limited; a book Hardcover lacks is looked up again after a day. */
   private val searches = ConcurrentHashMap<String, Pair<Instant, BookMatch?>>()
+  private val libroBooks = ConcurrentHashMap<String, Pair<Instant, Book?>>()
 
   suspend fun login() {
     tracker?.login()
@@ -232,17 +233,23 @@ class HardcoverSync(
       val key = "wanted:${book.isbn}"
       add(book.isbn, book.title, book.authors.firstOrNull(), target, listOf(Step.Wanted(key) to HardcoverAction(key, "Add to Want to Read")))
     }
+    val notOnLibro = mutableListOf<String>()
     if (syncWantToRead) {
       val onWishlist = libroWishlist.map { it.isbn }.toSet()
       val sentBefore = libro.addedFromTracker()
-      // Books already bought are not wished for again.
-      wanted.flatMap { book -> book.connectorAudioBook.mapNotNull { it.isbn13 }.map { it to book } }
-        .distinctBy { it.first }
-        .filter { (isbn, _) -> isbn !in skip && isbn !in libraryIsbns && isbn !in onWishlist && isbn !in sentBefore }
-        .forEach { (isbn, book) ->
-          val key = "libro:$isbn"
-          add(isbn, book.title, null, null, listOf(Step.LibroWishlist(key) to HardcoverAction(key, "Add to your libro.fm wishlist")))
+      for (book in wanted) {
+        val bookIsbns = book.connectorAudioBook.mapNotNull { it.isbn13 }.distinct()
+        // A book counts as bought, wished for or skipped under any of its audiobook editions.
+        if (bookIsbns.isEmpty() || bookIsbns.any { it in skip || it in libraryIsbns || it in onWishlist || it in sentBefore }) continue
+        // Hardcover lists every audiobook edition; only one of them is wished for, the first libro.fm sells.
+        val onLibro = bookIsbns.firstNotNullOfOrNull { libroBook(it) }
+        if (onLibro == null) {
+          notOnLibro += book.title
+          continue
         }
+        val key = "libro:${onLibro.isbn}"
+        add(onLibro.isbn, onLibro.title, onLibro.authors.firstOrNull(), null, listOf(Step.LibroWishlist(key) to HardcoverAction(key, "Add to your libro.fm wishlist")))
+      }
     }
 
     val id = UUID.randomUUID().toString()
@@ -256,6 +263,7 @@ class HardcoverSync(
         upToDate = upToDate,
         notFound = notFound.distinct().sortedBy { it.lowercase() },
         errors = errors,
+        notOnLibro = notOnLibro.distinct().sortedBy { it.lowercase() },
         progressCompared = includeProgress,
         progressSyncedAutomatically = serverInfo.hardcoverSyncProgress,
       ),
@@ -269,6 +277,21 @@ class HardcoverSync(
     val match = bestMatch(title, authors, tracker.searchBooks(query))
     searches[isbn] = clock.now() to match
     return match
+  }
+
+  /** The libro.fm book with this ISBN, or null when libro.fm doesn't sell it; remembered for a day. */
+  private suspend fun libroBook(isbn: String): Book? {
+    libroBooks[isbn]?.let { (at, book) -> if (clock.now() - at < 1.days) return book }
+    val book = try {
+      libro.bookDetails(isbn)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      logger.v("Hardcover: libro.fm has no book $isbn: ${e.message}")
+      null
+    }
+    libroBooks[isbn] = clock.now() to book
+    return book
   }
 
   private suspend fun apply(plan: Plan, keys: Set<String>): HardcoverApplyResult {

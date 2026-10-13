@@ -74,7 +74,9 @@ class HardcoverTrackerConnector(
         ConnectorBook(
           id = book.id.toString(),
           title = book.title.orEmpty(),
-          connectorAudioBook = book.editions.map { ConnectorAudioBookEdition(id = it.id.toString(), isbn13 = it.isbn_13) }
+          // The edition the user picked, if it's an audiobook, comes first.
+          connectorAudioBook = book.editions.sortedByDescending { it.id == userBook.edition_id }
+            .map { ConnectorAudioBookEdition(id = it.id.toString(), isbn13 = it.isbn_13) }
         )
       }
     }

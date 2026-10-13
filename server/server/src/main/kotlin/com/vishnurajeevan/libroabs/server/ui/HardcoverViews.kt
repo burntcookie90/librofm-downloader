@@ -91,6 +91,13 @@ fun FlowContent.hardcoverOverview(overview: HardcoverOverview) {
       ul { overview.notFound.forEach { li("small") { +it } } }
     }
   }
+  if (overview.notOnLibro.isNotEmpty()) {
+    details {
+      summary("muted small") { +"${pluralize(overview.notOnLibro.size, "Want to Read book")} libro.fm doesn't sell" }
+      p("muted small") { +"None of the audiobook editions Hardcover lists for these are on libro.fm." }
+      ul { overview.notOnLibro.forEach { li("small") { +it } } }
+    }
+  }
 }
 
 private fun FlowContent.hardcoverBookRow(book: HardcoverBookPlan) {

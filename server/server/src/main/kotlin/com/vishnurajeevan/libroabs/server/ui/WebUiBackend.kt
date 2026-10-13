@@ -132,6 +132,8 @@ data class HardcoverOverview(
   /** Titles Hardcover doesn't seem to have. */
   val notFound: List<String>,
   val errors: List<String> = emptyList(),
+  /** Want to Read titles libro.fm doesn't sell, in any of their audiobook editions. */
+  val notOnLibro: List<String> = emptyList(),
   /** Audiobookshelf is configured, so listening progress is compared. */
   val progressCompared: Boolean = false,
   /** HARDCOVER_SYNC_PROGRESS is on. */

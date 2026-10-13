@@ -130,8 +130,38 @@ class HardcoverSyncTest {
   fun wantToReadIsNotWishedForOnceBought() = runBlocking {
     shelves.library = listOf(testBook("777"))
     tracker.wanted = listOf(edition("b7", "e7", "777"), edition("b8", "e8", "888"))
+    shelves.details = { testBook(it) }
     sync(trackerInfo(mode = TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO)).syncAutomatically()
     assertEquals(listOf("888"), shelves.addedToWishlist)
+  }
+
+  @Test
+  fun aWantToReadBookIsWishedForOnceInAnEditionLibroSells() = runBlocking {
+    val editions = listOf("901", "902", "903").mapIndexed { i, isbn -> ConnectorAudioBookEdition("e$i", isbn) }
+    tracker.wanted = listOf(
+      ConnectorBook("b9", "Rogue Protocol", connectorAudioBook = editions),
+      ConnectorBook("b10", "Not Sold", connectorAudioBook = listOf(ConnectorAudioBookEdition("e10", "910"))),
+    )
+    shelves.details = { isbn -> if (isbn == "902") testBook(isbn, "Rogue Protocol") else error("not found") }
+    val sync = sync(trackerInfo(mode = TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO))
+
+    val preview = sync.preview()
+    assertEquals(listOf("libro:902"), preview.books.flatMap { book -> book.actions.map { it.key } })
+    assertEquals(listOf("Not Sold"), preview.notOnLibro)
+
+    sync.syncAutomatically()
+    assertEquals(listOf("902"), shelves.addedToWishlist)
+  }
+
+  @Test
+  fun aWantToReadBookBoughtInAnotherEditionIsNotWishedFor() = runBlocking {
+    shelves.library = listOf(testBook("902"))
+    tracker.wanted = listOf(
+      ConnectorBook("b9", "Rogue Protocol", connectorAudioBook = listOf(ConnectorAudioBookEdition("e1", "901"), ConnectorAudioBookEdition("e2", "902"))),
+    )
+    shelves.details = { testBook(it) }
+    sync(trackerInfo(mode = TrackerSyncMode.HARDCOVER_WANT_TO_READ_TO_LIBRO)).syncAutomatically()
+    assertTrue(shelves.addedToWishlist.isEmpty())
   }
 
   @Test
