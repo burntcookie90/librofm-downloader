@@ -180,6 +180,13 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
     attributes["hx-trigger"] = if (sync.running) "every 2s" else "every 15s"
     attributes["hx-swap"] = "outerHTML"
     div("card") { syncSummary(sync, info, view = "sync") }
+    if (info.audiobookshelf != null) {
+      div("card") {
+        h2 { +"Audiobookshelf metadata" }
+        p("muted small") { +"Compare your library's details in Audiobookshelf with libro.fm's, and choose which books to update." }
+        a("/ui/audiobookshelf", classes = "btn small") { +"Compare library" }
+      }
+    }
     div("grid two") {
       div("card") {
         h2 { +"libro.fm wishlist" }

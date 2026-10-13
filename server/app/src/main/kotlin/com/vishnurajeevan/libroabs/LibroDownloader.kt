@@ -132,7 +132,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       logLevel = logLevel,
       limit = limit,
       pathPattern = pathPattern,
-      healthCheckHost = healthChecksIoOptions?.healthCheckHost.orEmpty(),
+      healthCheckHost = healthChecksIoOptions?.healthCheckHost ?: "https://hc-ping.com",
       healthCheckId = healthChecksIoOptions?.healthCheckId,
       trackerToken = hardcoverOptions?.hardcoverToken,
       trackerEndpoint = hardcoverOptions?.hardcoverEndpoint.orEmpty(),

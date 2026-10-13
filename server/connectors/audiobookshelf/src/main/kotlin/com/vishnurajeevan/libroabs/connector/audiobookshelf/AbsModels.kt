@@ -28,13 +28,52 @@ data class AbsLibraryItem(
 data class AbsMedia(
   val metadata: AbsItemMetadata = AbsItemMetadata(),
   val chapters: List<AbsChapter> = emptyList(),
+  val coverPath: String? = null,
 )
 
+/**
+ * A book's details. Lists give the `*Name` summaries; a single expanded item gives [authors], [narrators] and
+ * [series] in full.
+ */
 @Serializable
 data class AbsItemMetadata(
   val title: String? = null,
+  val subtitle: String? = null,
+  val authors: List<AbsNamed> = emptyList(),
+  val authorName: String? = null,
+  val narrators: List<String> = emptyList(),
+  val series: List<AbsSeriesRef> = emptyList(),
+  val seriesName: String? = null,
+  val genres: List<String> = emptyList(),
+  val publishedYear: String? = null,
+  val publishedDate: String? = null,
+  val publisher: String? = null,
+  val description: String? = null,
   val isbn: String? = null,
+  val asin: String? = null,
 )
+
+@Serializable
+data class AbsNamed(val name: String)
+
+/** What Audiobookshelf has for an item, as metadata it could be given back (to write its `metadata.json`). */
+fun AbsItemMetadata.toBookMetadata() = AbsBookMetadata(
+  title = title.orEmpty(),
+  subtitle = subtitle,
+  authors = authors.map { it.name },
+  narrators = narrators,
+  series = series.firstOrNull()?.name,
+  seriesSequence = series.firstOrNull()?.sequence,
+  genres = genres,
+  publisher = publisher,
+  publishedDate = publishedDate,
+  publishedYearOverride = publishedYear,
+  description = description,
+  isbn = isbn,
+)
+
+@Serializable
+data class AbsSeriesRef(val name: String, val sequence: String? = null)
 
 @Serializable
 data class AbsChapter(
@@ -48,7 +87,7 @@ data class AbsChapter(
 internal data class LibrariesResponse(val libraries: List<AbsLibrary>)
 
 @Serializable
-internal data class ItemsResponse(val results: List<AbsLibraryItem> = emptyList())
+internal data class ItemsResponse(val results: List<AbsLibraryItem> = emptyList(), val total: Int = 0)
 
 @Serializable
 internal data class SearchResponse(val book: List<SearchHit> = emptyList())

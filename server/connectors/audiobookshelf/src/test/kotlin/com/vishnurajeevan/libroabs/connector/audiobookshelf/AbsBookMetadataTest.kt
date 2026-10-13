@@ -46,4 +46,12 @@ class AbsBookMetadataTest {
     assertFalse("narrators" in metadata)
     assertEquals("Martha Wells", metadata["authors"]!!.jsonArray.single().jsonObject["name"]!!.jsonPrimitive.content)
   }
+
+  @Test
+  fun updatesCanBeLimitedToChosenFields() {
+    val json = Json { explicitNulls = false }
+    val update = json.encodeToString(AbsBookMetadata.MediaUpdate.serializer(), book.toMediaUpdate(setOf(AbsField.NARRATORS)))
+    val metadata = Json.parseToJsonElement(update).jsonObject["metadata"]!!.jsonObject
+    assertEquals(setOf("narrators"), metadata.keys)
+  }
 }

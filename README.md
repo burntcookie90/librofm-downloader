@@ -98,6 +98,21 @@ with libro.fm's metadata, so it matches perfectly instead of being guessed from 
 A book that downloaded fine but couldn't be added to Audiobookshelf still counts as downloaded; the reason is shown on
 its download attempt.
 
+#### Syncing metadata for books already in Audiobookshelf
+
+Books added before this was set up (or by other means) can be brought in line too, and nothing changes until you
+confirm:
+
+- **One book:** on its page, *Compare with Audiobookshelf* shows each field Audiobookshelf has next to libro.fm's, and
+  the two covers side by side. Untick anything you'd rather keep, then apply.
+- **The whole library:** *Sync → Compare library* lists every book whose details differ, with the fields to update, and
+  applies the ones you select.
+
+Books are matched by ISBN, then by the folder this app saved them to, then by title and author. libro.fm's metadata is
+tidied on the way: credentials are dropped from names ("Dr", ", MD", ", PhD"), and a series or author your library
+already has under a slightly different spelling ("The Wheel of Time" for libro.fm's "Wheel of Time") keeps your
+library's spelling. Afterwards the book's `metadata.json` mirrors what Audiobookshelf has, so a rescan won't undo it.
+
 | Variable | |
 |---|---|
 | `ABS_URL` | Audiobookshelf's address, e.g. `http://audiobookshelf:80` |
