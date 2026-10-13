@@ -69,6 +69,7 @@ class RealWebUiBackendTest {
       override suspend fun apply(book: com.vishnurajeevan.libroabs.models.libro.Book, downloadDir: File?, itemId: String, fields: Set<String>?, replaceCover: Boolean) = error("unused")
       override suspend fun cover(itemId: String) = null
     },
+    hardcoverSync = com.vishnurajeevan.libroabs.tracker.disabledHardcoverSync(),
   )
 
   @AfterTest

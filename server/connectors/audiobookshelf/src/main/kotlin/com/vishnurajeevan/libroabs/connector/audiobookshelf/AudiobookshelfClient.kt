@@ -124,6 +124,10 @@ class AudiobookshelfClient(
       parameter("limit", limit)
     }.body<SearchResponse>().book.map { it.libraryItem }
 
+  /** The API key's user's listening progress, one entry per item (or podcast episode) they've started. */
+  suspend fun mediaProgress(): List<AbsMediaProgress> =
+    http.get("$api/me") { auth() }.body<MeResponse>().mediaProgress
+
   suspend fun item(itemId: String): AbsLibraryItem =
     http.get("$api/items/$itemId") { auth(); parameter("expanded", 1) }.body()
 

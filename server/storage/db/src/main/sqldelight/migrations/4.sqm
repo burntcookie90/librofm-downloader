@@ -1,0 +1,4 @@
+CREATE TABLE sync_state (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);

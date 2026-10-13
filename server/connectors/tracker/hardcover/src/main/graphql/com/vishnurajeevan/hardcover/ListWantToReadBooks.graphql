@@ -5,6 +5,7 @@ query MyWantToRead {
         id
         title
         editions(where: {reading_format: {format: { _eq:"Listened"}}}) {
+          id
           reading_format {
             id
             format

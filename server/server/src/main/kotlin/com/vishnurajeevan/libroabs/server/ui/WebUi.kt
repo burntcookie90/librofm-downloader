@@ -258,6 +258,8 @@ private suspend fun ApplicationCall.notFoundPage(what: String) {
 /** Audiobookshelf item IDs are UUIDs (older ones `li_…`); anything else must not reach its API's paths. */
 private fun String.isAbsItemId() = matches(Regex("[A-Za-z0-9_-]{1,64}"))
 
+private fun String.isHardcoverActionKey() = matches(Regex("(owned|wanted|progress|libro):[0-9Xx-]{1,20}"))
+
 private fun describe(outcome: EnqueueOutcome, title: String? = null): Pair<String, String> {
   val name = title?.let { "“${it.truncate(40)}”" } ?: "Download"
   return when (outcome) {
@@ -591,6 +593,48 @@ private fun Route.uiRoutes(backend: WebUiBackend, authEnabled: Boolean) {
       call.response.headers.append(HttpHeaders.CacheControl, "private, max-age=300")
       call.respondBytes(cover.first, ContentType.parse(cover.second))
     }
+  }
+
+  // ---- hardcover ----
+  suspend fun RoutingContext.requireHardcover(): Boolean {
+    if (!backend.hardcoverEnabled) call.notFoundPage("Hardcover integration")
+    return backend.hardcoverEnabled
+  }
+
+  get("hardcover") {
+    if (!requireHardcover()) return@get
+    call.page("Hardcover", NavItem.SYNC) { hardcoverPage() }
+  }
+  get("hardcover/preview") {
+    if (!requireHardcover()) return@get
+    val overview = try {
+      backend.hardcoverPlan()
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      call.application.log.warn("Comparing with Hardcover failed", e)
+      call.fragment { div("alert bad") { +"Couldn't compare with Hardcover: ${e.message ?: e::class.simpleName}" } }
+      return@get
+    }
+    call.fragment { hardcoverOverview(overview) }
+  }
+  post("hardcover/apply") {
+    if (!requireHardcover()) return@post
+    val params = call.params()
+    val planId = params["planId"].orEmpty()
+    val keys = params.getAll("action").orEmpty().filter { it.isHardcoverActionKey() }.toSet()
+    if (keys.isEmpty()) {
+      call.toast("Select at least one change first.", "bad")
+      call.respond(HttpStatusCode.NoContent)
+      return@post
+    }
+    val result = backend.hardcoverApply(planId, keys)
+    when {
+      result.expired -> call.toast("That comparison is out of date; compare again.", "bad")
+      result.failures.isEmpty() -> call.toast("Updated ${pluralize(result.applied, "book")} on Hardcover.")
+      else -> call.toast("${pluralize(result.failures.size, "book")} failed.", "bad")
+    }
+    call.fragment { hardcoverApplyResults(result, backend.serverInfo.dryRun) }
   }
 
   // ---- sync ----

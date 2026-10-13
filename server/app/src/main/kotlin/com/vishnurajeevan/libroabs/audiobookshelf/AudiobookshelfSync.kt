@@ -5,6 +5,7 @@ import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsField
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsFolder
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsLibrary
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsLibraryItem
+import com.vishnurajeevan.libroabs.connector.audiobookshelf.AbsMediaProgress
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AudiobookshelfClient
 import com.vishnurajeevan.libroabs.connector.audiobookshelf.AudiobookshelfException
 import com.vishnurajeevan.libroabs.models.Logger
@@ -76,6 +77,8 @@ class AudiobookshelfSync(
   suspend fun allItems(): List<AbsLibraryItem> = client.allItems(target().library.id)
 
   suspend fun item(itemId: String): AbsLibraryItem = client.item(itemId)
+
+  suspend fun mediaProgress(): List<AbsMediaProgress> = client.mediaProgress()
 
   suspend fun cover(itemId: String): Pair<ByteArray, String> = client.cover(itemId)
 

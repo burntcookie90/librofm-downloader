@@ -42,4 +42,8 @@ interface DatabaseComponent {
   @SingleIn(AppScope::class)
   @Provides
   fun downloadAttemptQueries(db: Database): DownloadAttemptQueries = db.downloadAttemptQueries
+
+  @SingleIn(AppScope::class)
+  @Provides
+  fun syncStateQueries(db: Database): SyncStateQueries = db.syncStateQueries
 }

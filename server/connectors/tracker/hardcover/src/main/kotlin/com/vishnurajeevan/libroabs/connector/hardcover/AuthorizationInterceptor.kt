@@ -6,17 +6,11 @@ import com.apollographql.apollo.network.http.HttpInterceptor
 import com.apollographql.apollo.network.http.HttpInterceptorChain
 
 internal class AuthorizationInterceptor(
-  private val token: String,
+  token: String,
 ) : HttpInterceptor {
+  // Hardcover shows the token as "Bearer ey…"; accept it pasted either way.
+  private val token = token.trim().removePrefix("Bearer ").trim()
 
-  override suspend fun intercept(request: HttpRequest, chain: HttpInterceptorChain): HttpResponse {
-    val newRequest = request.newBuilder().addHeader("Authorization", "Bearer $token").build()
-    val response = chain.proceed(newRequest)
-
-    return if (response.statusCode == 401) {
-      chain.proceed(newRequest)
-    } else {
-      response
-    }
-  }
+  override suspend fun intercept(request: HttpRequest, chain: HttpInterceptorChain): HttpResponse =
+    chain.proceed(request.newBuilder().addHeader("Authorization", "Bearer $token").build())
 }

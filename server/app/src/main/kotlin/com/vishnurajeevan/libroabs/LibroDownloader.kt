@@ -141,6 +141,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       audioQuality = audioQuality,
       skipTrackingIsbns = skipTrackingIsbns,
       hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
+      hardcoverSyncProgress = hardcoverOptions?.hardcoverSyncProgress ?: false,
       webhookUrls = webhookUrls,
       webUiPassword = webUiPassword?.takeIf { it.isNotEmpty() },
       audiobookshelf = audiobookshelfOptions?.toConfig(),

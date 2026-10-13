@@ -201,7 +201,12 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
           dl("kv") {
             dt { +"Mode" }
             dd { +trackerModeLabel(info.hardcoverSyncMode) }
+            if (info.audiobookshelf != null) {
+              dt { +"Listening progress" }
+              dd { +if (info.hardcoverSyncProgress) "Sent on every sync" else "Sent from the Hardcover page only" }
+            }
           }
+          a("/ui/hardcover", classes = "btn small") { +"Preview changes" }
           h3 { +"Wishlist items synced" }
           syncedList(wishlist.trackerSynced, "No wishlist books have been synced.")
         }

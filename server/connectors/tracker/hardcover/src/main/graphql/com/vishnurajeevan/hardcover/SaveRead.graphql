@@ -1,0 +1,13 @@
+mutation InsertRead($userBookId: Int!, $read: DatesReadInput!) {
+  insert_user_book_read(user_book_id: $userBookId, user_book_read: $read) {
+    id
+    error
+  }
+}
+
+mutation UpdateRead($id: Int!, $read: DatesReadInput!) {
+  update_user_book_read(id: $id, object: $read) {
+    id
+    error
+  }
+}

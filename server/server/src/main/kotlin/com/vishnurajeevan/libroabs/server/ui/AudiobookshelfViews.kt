@@ -265,7 +265,7 @@ fun FlowContent.absOverview(overview: AbsSyncOverview, fields: List<Pair<String,
   }
 }
 
-private fun FlowContent.stat(n: Int, label: String, kind: String) {
+internal fun FlowContent.stat(n: Int, label: String, kind: String) {
   div("stat $kind".trim()) {
     span("n") { +n.toString() }
     span("l") { +label }
