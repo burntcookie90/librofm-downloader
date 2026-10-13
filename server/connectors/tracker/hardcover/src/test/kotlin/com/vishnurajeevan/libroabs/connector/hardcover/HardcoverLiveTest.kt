@@ -1,0 +1,41 @@
+package com.vishnurajeevan.libroabs.connector.hardcover
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.junit.Assume.assumeTrue
+import kotlin.test.Test
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+/** Read-only checks against the real Hardcover API; runs only when HARDCOVER_TOKEN is set. Nothing is changed. */
+class HardcoverLiveTest {
+  private val token = System.getenv("HARDCOVER_TOKEN").orEmpty().removePrefix("Bearer ").trim()
+
+  @Test
+  fun readsTheAccount() = runBlocking {
+    assumeTrue(token.isNotEmpty())
+    val connector = HardcoverTrackerConnector(
+      token = token,
+      endpoint = "https://api.hardcover.app/v1/graphql",
+      logger = ::println,
+      dispatcher = Dispatchers.IO,
+    )
+    connector.login()
+
+    val wanted = connector.getWantedBooks()
+    val read = connector.getReadBooks()
+    val owned = connector.getOwnedBooks()
+    println("want to read ${wanted.size}, read ${read.size}, owned ${owned.size}")
+
+    val found = connector.searchByTitle("All Systems Red", "Martha Wells")
+    println("search -> $found")
+    assertNotNull(found)
+    assertTrue(found.contributions.any { it.name == "Martha Wells" })
+
+    // All Systems Red's Tor.com hardcover, for accounts with nothing on their lists yet.
+    val isbn = (owned + wanted + read).flatMap { it.connectorAudioBook }.firstNotNullOfOrNull { it.isbn13 } ?: "9780765397539"
+    val editions = connector.getEditions(listOf(isbn))
+    println("editions for $isbn -> ${editions.map { it.title }}")
+    assertTrue(editions.flatMap { it.connectorAudioBook }.any { it.isbn13 == isbn })
+  }
+}
