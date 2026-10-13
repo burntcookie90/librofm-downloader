@@ -15,7 +15,12 @@ import kotlinx.html.id
 import kotlinx.html.p
 import kotlinx.html.span
 
-fun FlowContent.bookDetailPage(entry: LibraryEntry, attempts: List<DownloadAttempt>, defaultFormat: BookFormat) {
+fun FlowContent.bookDetailPage(
+  entry: LibraryEntry,
+  attempts: List<DownloadAttempt>,
+  defaultFormat: BookFormat,
+  audiobookshelf: Boolean = false,
+) {
   val book = entry.book
   div {
     a("/ui/library", classes = "muted small") { +"← Library" }
@@ -29,6 +34,7 @@ fun FlowContent.bookDetailPage(entry: LibraryEntry, attempts: List<DownloadAttem
     }
   }
   bookLive(entry, attempts, defaultFormat)
+  if (audiobookshelf) absBookCard(book.isbn)
   div("grid two") {
     div("card") {
       h2 { +"Details" }

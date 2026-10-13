@@ -82,6 +82,46 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
   ALL // CAREFUL as this can cause double syncs. The service will remember what was synced, but you'll need to manaully clean up anything on hardcover or librofm
 ```
 
+### Audiobookshelf
+
+Set `ABS_URL` and `ABS_API_KEY` and every downloaded book is added to [Audiobookshelf](https://www.audiobookshelf.org/)
+with libro.fm's metadata, so it matches perfectly instead of being guessed from the files:
+
+- A `metadata.json` (Audiobookshelf's own format) and `cover.jpg` are written next to the audio. Audiobookshelf reads
+  these on every scan, so the book keeps the right title, authors, narrators, series and number, genres, publisher,
+  publication date, description and ISBN even if the library is rescanned or rebuilt.
+- Audiobookshelf is told about just that book, instead of rescanning the whole library. If it hasn't picked the book up
+  after a minute (its folder watcher may be off), the library is scanned.
+- Once the book shows up, its details and cover are set from libro.fm through the API, and its chapters get libro.fm's
+  names in place of "Track 001".
+
+A book that downloaded fine but couldn't be added to Audiobookshelf still counts as downloaded; the reason is shown on
+its download attempt.
+
+#### Syncing metadata for books already in Audiobookshelf
+
+Books added before this was set up (or by other means) can be brought in line too, and nothing changes until you
+confirm:
+
+- **One book:** on its page, *Compare with Audiobookshelf* shows each field Audiobookshelf has next to libro.fm's, and
+  the two covers side by side. Untick anything you'd rather keep, then apply.
+- **The whole library:** *Sync → Compare library* lists every book whose details differ, with the fields to update, and
+  applies the ones you select.
+
+Books are matched by ISBN, then by the folder this app saved them to, then by title and author. libro.fm's metadata is
+tidied on the way: credentials are dropped from names ("Dr", ", MD", ", PhD"), and a series or author your library
+already has under a slightly different spelling ("The Wheel of Time" for libro.fm's "Wheel of Time") keeps your
+library's spelling. Afterwards the book's `metadata.json` mirrors what Audiobookshelf has, so a rescan won't undo it.
+
+| Variable | |
+|---|---|
+| `ABS_URL` | Audiobookshelf's address, e.g. `http://audiobookshelf:80` |
+| `ABS_API_KEY` | An API key (Settings → API Keys) for an **admin** user: adding a single book is admin-only. |
+| `ABS_LIBRARY_ID` | Only needed when Audiobookshelf has more than one book library. |
+| `ABS_IMPORT_MODE` | `SHARED` (default): Audiobookshelf reads the same folder this app downloads to. `UPLOAD`: Audiobookshelf runs somewhere that can't see that folder, so the files are uploaded to it (into `<author>/<series>/<title>`). |
+| `ABS_MEDIA_PATH` | `SHARED` only: where Audiobookshelf sees this app's `/media`, when that isn't the library's only folder. With `/mnt/user/media/audiobooks` mounted at `/media` here and at `/audiobooks` in Audiobookshelf, a library folder of `/audiobooks` needs nothing. |
+| `WRITE_ABS_METADATA` | `true` writes `metadata.json` and `cover.jpg` without using the API, e.g. alongside a scan webhook. |
+
 ### Docker Compose Example
 ```
 services:
@@ -108,6 +148,8 @@ services:
       - HARDCOVER_TOKEN=<>
       - SKIP_TRACKING_ISBNS=<>
       - HEALTHCHECK_ID=<>
+      - ABS_URL=http://audiobookshelf:80
+      - ABS_API_KEY=<>
 ```
 
 ### Running as a non-root user

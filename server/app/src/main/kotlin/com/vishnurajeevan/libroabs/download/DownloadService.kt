@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.download
 
+import com.vishnurajeevan.libroabs.audiobookshelf.LibraryImporter
 import com.vishnurajeevan.libroabs.converter.ffmpeg.M4bConverter
 import com.vishnurajeevan.libroabs.db.repo.DownloadAttemptRepo
 import com.vishnurajeevan.libroabs.db.writer.DbWriter
@@ -29,6 +30,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -39,6 +42,8 @@ import kotlinx.coroutines.withContext
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class EnqueueResult(
@@ -67,6 +72,7 @@ class DownloadService(
   private val attemptRepo: DownloadAttemptRepo,
   private val dbWriter: DbWriter,
   private val targetDir: (Book) -> File,
+  private val importer: LibraryImporter,
 ) {
   private class Running(val attemptId: Long, val job: Job, val result: CompletableDeferred<AttemptStatus>)
 
@@ -96,11 +102,14 @@ class DownloadService(
 
     val attemptId = attemptRepo.create(book.isbn, book.title, trigger, format, System.currentTimeMillis())
     val result = CompletableDeferred<AttemptStatus>()
-    val job = processingScope.launch(start = CoroutineStart.LAZY) {
-      execute(attemptId, book, trigger, format ?: serverInfo.format, result)
+    val registered = CompletableDeferred<Unit>()
+    // ATOMIC: a coroutine cancelled before it is dispatched would otherwise never run at all, skipping the cleanup that
+    // finishes the attempt, completes [result] and frees the book.
+    val job = processingScope.launch(start = CoroutineStart.ATOMIC) {
+      execute(attemptId, book, trigger, format ?: serverInfo.format, result, registered)
     }
     running[book.isbn] = Running(attemptId, job, result)
-    job.start()
+    registered.complete(Unit)
     EnqueueResult(attemptId, false, result)
   }
 
@@ -119,12 +128,18 @@ class DownloadService(
     trigger: AttemptTrigger,
     format: BookFormat,
     result: CompletableDeferred<AttemptStatus>,
+    registered: CompletableDeferred<Unit>,
   ) {
     var status = AttemptStatus.FAILED
     var error: String? = null
     var downloaded: DownloadedFormat? = null
     try {
-      processingSemaphore.withPermit {
+      // Don't get ahead of enqueue: the cleanup below removes this attempt from `running`.
+      registered.await()
+      // Neither of these suspends when there's nothing to wait for, so check for a cancel explicitly.
+      currentCoroutineContext().ensureActive()
+      val dir = processingSemaphore.withPermit {
+        currentCoroutineContext().ensureActive()
         attemptRepo.markRunning(attemptId, System.currentTimeMillis())
         lfdLogger.v("Downloading ${book.title}")
         val dir = targetDir(book).also { it.mkdirs() }
@@ -142,6 +157,20 @@ class DownloadService(
           } catch (e: Exception) {
             error = "Book downloaded, but extras failed: ${e.describe()}"
           }
+        }
+        dir
+      }
+      // Outside the download slot: waiting on Audiobookshelf shouldn't hold up the next book.
+      if (importer.enabled) {
+        try {
+          steps[attemptId] = "Adding to Audiobookshelf"
+          importer.import(book, dir)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          val failure = "Book downloaded, but adding it to Audiobookshelf failed: ${e.describe()}"
+          lfdLogger.i("${book.title}: $failure")
+          error = listOfNotNull(error, failure).joinToString("; ")
         }
       }
       status = AttemptStatus.SUCCEEDED
@@ -331,7 +360,7 @@ class DownloadService(
       .forEachIndexed({ index, file ->
         val newFilename = newFilenames[index]
         val newFile = File(targetDirectory, "$newFilename.${file.extension}")
-        file.renameTo(newFile)
+        Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
 
         if (writeTitleTag) {
           val audioFile = AudioFileIO.read(newFile)

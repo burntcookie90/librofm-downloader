@@ -180,6 +180,13 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
     attributes["hx-trigger"] = if (sync.running) "every 2s" else "every 15s"
     attributes["hx-swap"] = "outerHTML"
     div("card") { syncSummary(sync, info, view = "sync") }
+    if (info.audiobookshelf != null) {
+      div("card") {
+        h2 { +"Audiobookshelf metadata" }
+        p("muted small") { +"Compare your library's details in Audiobookshelf with libro.fm's, and choose which books to update." }
+        a("/ui/audiobookshelf", classes = "btn small") { +"Compare library" }
+      }
+    }
     div("grid two") {
       div("card") {
         h2 { +"libro.fm wishlist" }
@@ -269,6 +276,8 @@ fun FlowContent.settingsPage(info: ServerInfo) {
       "Tracker sync mode" to trackerModeLabel(info.hardcoverSyncMode),
       "Skipped ISBNs" to info.skipTrackingIsbns.joinToString(", ").ifEmpty { "None" },
       "Health check" to if (info.healthCheckId.isNullOrEmpty()) "Disabled" else "${info.healthCheckHost}/…",
+      "Audiobookshelf" to (info.audiobookshelf?.let { "${it.url.substringAfter("://").substringBefore('/')} (${it.mode.name.lowercase()})" }
+        ?: if (info.writesAbsMetadataFiles) "Metadata files only" else "Disabled"),
       "Webhooks" to (info.webhookUrls.joinToString(", ") { it.substringAfter("://").substringBefore('/') }.ifEmpty { "None" }),
     )
     settingsCard(
