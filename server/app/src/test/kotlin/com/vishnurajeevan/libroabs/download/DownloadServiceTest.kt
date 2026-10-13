@@ -34,6 +34,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Instant
 import java.io.File
@@ -72,11 +73,11 @@ class DownloadServiceTest {
     hardcoverSyncMode = TrackerSyncMode.ALL,
   )
 
-  private fun service(info: ServerInfo = info(), parallel: Int = 2) = DownloadService(
+  private fun service(info: ServerInfo = info(), parallel: Int = 2, processingScope: CoroutineScope = scope) = DownloadService(
     serverInfo = info,
     ffmpegClient = converter,
     libroClient = downloader,
-    processingScope = scope,
+    processingScope = processingScope,
     ioDispatcher = Dispatchers.IO,
     processingSemaphore = Semaphore(parallel),
     lfdLogger = object : Logger {
@@ -257,6 +258,29 @@ class DownloadServiceTest {
     gate.complete(Unit)
     assertEquals(AttemptStatus.SUCCEEDED, running.result.await())
     assertFalse(downloader.calls.contains("m4bmeta:8"))
+  }
+
+  @Test
+  fun cancellingBeforeTheDownloadIsEvenDispatchedStillFinishesTheAttempt() = await {
+    // A single worker kept busy, so the download can't start before it is cancelled.
+    val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val busy = java.util.concurrent.CountDownLatch(1)
+    worker.execute { busy.await() }
+    val workerScope = CoroutineScope(SupervisorJob() + worker.asCoroutineDispatcher())
+    try {
+      val service = service(processingScope = workerScope)
+      val r = service.enqueue(book("14"), AttemptTrigger.MANUAL)
+      assertTrue(service.cancel(r.attemptId))
+      busy.countDown()
+
+      assertEquals(AttemptStatus.CANCELLED, r.result.await())
+      assertEquals(AttemptStatus.CANCELLED, attempts.get(r.attemptId)!!.status)
+      assertFalse(service.isActive("14"), "the book can be queued again")
+      assertFalse(downloader.calls.any { it.endsWith(":14") })
+    } finally {
+      workerScope.cancel()
+      worker.shutdownNow()
+    }
   }
 
   @Test
