@@ -39,6 +39,8 @@ import kotlinx.coroutines.withContext
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class EnqueueResult(
@@ -331,7 +333,7 @@ class DownloadService(
       .forEachIndexed({ index, file ->
         val newFilename = newFilenames[index]
         val newFile = File(targetDirectory, "$newFilename.${file.extension}")
-        file.renameTo(newFile)
+        Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
 
         if (writeTitleTag) {
           val audioFile = AudioFileIO.read(newFile)

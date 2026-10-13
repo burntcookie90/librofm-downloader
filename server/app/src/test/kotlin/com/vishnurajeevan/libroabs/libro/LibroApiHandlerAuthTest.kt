@@ -31,7 +31,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFails
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import java.io.IOException
 
 class LibroApiHandlerAuthTest {
   /** Behaves like libro.fm: only the latest issued token works, and anything else gets 401 `{"error": ...}`. */
@@ -40,6 +43,10 @@ class LibroApiHandlerAuthTest {
     @Volatile var password = "right"
     @Volatile var rejectEverything = false
     @Volatile var validToken = "issued-0"
+    /** The next this-many library requests fail with 503. */
+    val libraryOutages = AtomicInteger(0)
+    val libraryRequests = AtomicInteger(0)
+    @Volatile var m4bStatus = HttpStatusCode.OK
 
     val engine = MockEngine { request ->
       val json = headersOf(HttpHeaders.ContentType, "application/json")
@@ -53,12 +60,24 @@ class LibroApiHandlerAuthTest {
             respond("""{"access_token":"$validToken"}""", HttpStatusCode.OK, json)
           }
         }
-        else ->
-          if (!rejectEverything && request.headers[HttpHeaders.Authorization] == "Bearer $validToken") {
-            respond("""{"page":1,"total_pages":1,"audiobooks":[]}""", HttpStatusCode.OK, json)
-          } else {
+        else -> when {
+          rejectEverything || request.headers[HttpHeaders.Authorization] != "Bearer $validToken" ->
             respond("""{"error":"Not authorized."}""", HttpStatusCode.Unauthorized, json)
+          request.url.encodedPath.endsWith("/packaged_m4b") ->
+            if (m4bStatus == HttpStatusCode.OK) {
+              respond("""{"m4b_url":"https://cdn.example/book.m4b"}""", HttpStatusCode.OK, json)
+            } else {
+              respond("""{"error":"nope"}""", m4bStatus, json)
+            }
+          else -> {
+            libraryRequests.incrementAndGet()
+            if (libraryOutages.getAndDecrement() > 0) {
+              respond("upstream unavailable", HttpStatusCode.ServiceUnavailable)
+            } else {
+              respond("""{"page":1,"total_pages":1,"audiobooks":[]}""", HttpStatusCode.OK, json)
+            }
           }
+        }
       }
     }
   }
@@ -74,7 +93,7 @@ class LibroApiHandlerAuthTest {
   private val library = MemoryStorage(LibraryMetadata(page = 7))
 
   private fun handler(): LibroApiHandler {
-    val client = HttpClient(libro.engine) { configureLibroApi(emptyMap()) }
+    val client = HttpClient(libro.engine) { configureLibroApi(emptyMap(), retryDelayMs = 1) }
     val api = Ktorfit.Builder().baseUrl("https://libro.fm/").httpClient(client)
       .converterFactories(ResponseConverterFactory()).build().createLibroAPI()
     return LibroApiHandler(
@@ -148,5 +167,46 @@ class LibroApiHandlerAuthTest {
     libro.password = "changed"
     val e = assertFailsWith<IllegalArgumentException> { handler().fetchLoginData("reader", "right") }
     assertEquals("libro.fm rejected the login; check LIBRO_FM_USERNAME and LIBRO_FM_PASSWORD", e.message)
+  }
+
+  @Test
+  fun libraryOutagesAreRetried() = runBlocking {
+    val handler = handler()
+    tokens.value = AuthToken(token = "issued-0", username = "reader")
+    handler.fetchLoginData("reader", "right")
+    libro.libraryOutages.set(2)
+    handler.fetchLibrary()
+    assertEquals(3, libro.libraryRequests.get())
+    assertEquals(1, library.value.page)
+  }
+
+  @Test
+  fun aLastingOutageFailsWithoutTouchingTheLibrary() = runBlocking {
+    val handler = handler()
+    tokens.value = AuthToken(token = "issued-0", username = "reader")
+    handler.fetchLoginData("reader", "right")
+    libro.libraryOutages.set(100)
+    assertFails { handler.fetchLibrary() }
+    assertEquals(4, libro.libraryRequests.get(), "one request and three retries")
+    assertEquals(7, library.value.page)
+  }
+
+  @Test
+  fun aMissingM4bIsReportedAsMissing() = runBlocking {
+    val handler = handler()
+    tokens.value = AuthToken(token = "issued-0", username = "reader")
+    libro.m4bStatus = HttpStatusCode.NotFound
+    assertTrue(handler.fetchM4bMetadata("123").isFailure)
+    libro.m4bStatus = HttpStatusCode.OK
+    assertEquals("https://cdn.example/book.m4b", handler.fetchM4bMetadata("123").getOrThrow().m4b_url)
+  }
+
+  @Test
+  fun anM4bOutageIsAnErrorNotAFallbackToMp3() = runBlocking {
+    val handler = handler()
+    tokens.value = AuthToken(token = "issued-0", username = "reader")
+    libro.m4bStatus = HttpStatusCode.BadGateway
+    assertFailsWith<IOException> { handler.fetchM4bMetadata("123") }
+    Unit
   }
 }

@@ -45,8 +45,11 @@ interface NetworkComponent {
   @Provides
   @Named("download")
   fun downloadClient(client: HttpClient): HttpClient = client.config {
+    // No overall limit: a large M4B on a slow line can take far longer than any fixed time. A connection that stops
+    // sending data is still caught, and downloadTo retries it.
     install(HttpTimeout) {
-      requestTimeoutMillis = 5 * 60 * 1000
+      connectTimeoutMillis = 30_000
+      socketTimeoutMillis = 60_000
     }
   }
 
