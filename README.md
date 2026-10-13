@@ -82,6 +82,12 @@ You can set the env var `PATH_PATTERN` to change the default path pattern. The d
   ALL // CAREFUL as this can cause double syncs. The service will remember what was synced, but you'll need to manaully clean up anything on hardcover or librofm
 ```
 
+Set `HARDCOVER_TOKEN` to the token from [hardcover.app/account/api](https://hardcover.app/account/api) (with or without
+its `Bearer ` prefix). Requests are kept under Hardcover's limit of 60 a minute, so a first sync of a large library takes
+a few minutes. A book that fails is logged and reported in the sync status without stopping the others; a rejected token
+or the daily limit stops the Hardcover sync until the next run. With `DRY_RUN=true`, Hardcover is read but only the
+changes it would make are logged.
+
 ### Audiobookshelf
 
 Set `ABS_URL` and `ABS_API_KEY` and every downloaded book is added to [Audiobookshelf](https://www.audiobookshelf.org/)

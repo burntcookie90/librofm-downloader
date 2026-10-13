@@ -1,5 +1,6 @@
 package com.vishnurajeevan.libroabs.connector.hardcover
 
+import com.vishnurajeevan.libroabs.models.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -17,7 +18,10 @@ class HardcoverLiveTest {
     val connector = HardcoverTrackerConnector(
       token = token,
       endpoint = "https://api.hardcover.app/v1/graphql",
-      logger = ::println,
+      logger = object : Logger {
+        override fun v(msg: String) = Unit
+        override fun i(msg: String) = println(msg)
+      },
       dispatcher = Dispatchers.IO,
     )
     connector.login()

@@ -5,6 +5,7 @@ query MyRead {
         id
         title
         editions {
+          id
           reading_format {
             id
             format

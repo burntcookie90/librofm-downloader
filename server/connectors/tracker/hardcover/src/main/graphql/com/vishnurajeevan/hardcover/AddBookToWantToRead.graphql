@@ -1,5 +1,7 @@
-mutation addBook($bookId: Int!) {
-  insert_user_book(object: {book_id: $bookId, status_id: 1}) {
+# Passing the edition makes Hardcover show the audiobook rather than its default edition.
+mutation addBook($bookId: Int!, $editionId: Int) {
+  insert_user_book(object: {book_id: $bookId, edition_id: $editionId, status_id: 1}) {
     id
+    error
   }
 }
