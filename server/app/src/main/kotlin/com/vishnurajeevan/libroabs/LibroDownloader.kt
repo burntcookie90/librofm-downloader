@@ -24,6 +24,7 @@ import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
 import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
 import dev.zacsweers.metro.createGraph
 import dev.zacsweers.metro.createGraphFactory
+import kotlin.time.Duration
 
 suspend fun main(args: Array<String>) = LibroDownloader().main(args)
 
@@ -142,6 +143,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       skipTrackingIsbns = skipTrackingIsbns,
       hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
       hardcoverSyncProgress = hardcoverOptions?.hardcoverSyncProgress ?: false,
+      hardcoverSyncInterval = hardcoverOptions?.hardcoverSyncInterval ?: Duration.ZERO,
       webhookUrls = webhookUrls,
       webUiPassword = webUiPassword?.takeIf { it.isNotEmpty() },
       audiobookshelf = audiobookshelfOptions?.toConfig(),
