@@ -95,9 +95,13 @@ class SyncController(
   }
 
   /** Runs [block] (a sync) unless one is already running, in which case it is skipped and `false` returned. */
-  suspend fun runIfIdle(trigger: SyncTrigger, block: suspend () -> Unit): Boolean {
+  suspend fun runIfIdle(
+    trigger: SyncTrigger,
+    name: String = "${trigger.name.lowercase()} sync",
+    block: suspend () -> Unit,
+  ): Boolean {
     if (!exclusive.tryLock()) {
-      logger.i("Skipping ${trigger.name.lowercase()} sync: another sync is still running")
+      logger.i("Skipping $name: another sync is still running")
       return false
     }
     try {

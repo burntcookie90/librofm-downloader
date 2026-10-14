@@ -1,6 +1,8 @@
 package com.vishnurajeevan.libroabs.models.server
 
 import dev.zacsweers.redacted.annotations.Redacted
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 data class ServerInfo(
   val libroUserName: String,
@@ -37,6 +39,8 @@ data class ServerInfo(
   val writeAbsMetadata: Boolean = false,
   /** Sends Audiobookshelf listening progress to Hardcover on every sync. */
   val hardcoverSyncProgress: Boolean = false,
+  /** How often Hardcover is synced between library syncs; [Duration.ZERO] syncs it only with the library. */
+  val hardcoverSyncInterval: Duration = 30.minutes,
 ) {
   val writesAbsMetadataFiles: Boolean get() = writeAbsMetadata || audiobookshelf != null
 
@@ -60,6 +64,7 @@ data class ServerInfo(
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
       |  Tracker progress sync: $hardcoverSyncProgress
+      |  Tracker sync interval: ${if (hardcoverSyncInterval == Duration.ZERO) "with library sync" else hardcoverSyncInterval}
       |  Webhooks: ${webhookUrls.map(::webhookHost)}
       |  LibroFM Headers: ${libroFmHeaders.keys}
       |  Web UI Password Protected: ${!webUiPassword.isNullOrEmpty()}

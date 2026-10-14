@@ -100,6 +100,11 @@ Ignored) is left alone. Books not played for a month are left unticked, as they 
 `HARDCOVER_SYNC_PROGRESS=true` to send progress on every sync; only listening from then on is sent automatically, and
 earlier progress can be sent from the preview. Progress comes from the Audiobookshelf user that `ABS_API_KEY` belongs to.
 
+**Schedule.** Hardcover is synced with every library sync and, in between, every `HARDCOVER_SYNC_INTERVAL` (`30m` by
+default; `1h`, `2h30m`, ... at least `5m`, or `0` to sync it only with the library). A sync that finds nothing to change
+takes a handful of requests, so even every few minutes stays far inside Hardcover's limits. A download that fails
+doesn't stop Hardcover from syncing.
+
 Requests are kept under Hardcover's limit of 60 a minute, so a first sync of a large library takes a few minutes. A book
 that fails is logged and reported in the sync status without stopping the others; a rejected token or the daily limit
 stops the Hardcover sync until the next run. With `DRY_RUN=true`, Hardcover is read but only the changes it would make
@@ -170,6 +175,7 @@ services:
       - WRITE_TITLE_TAG=true #this one requires RENAME_CHAPTERS to be true as well
       - HARDCOVER_TOKEN=<>
       - HARDCOVER_SYNC_PROGRESS=true #sends Audiobookshelf listening progress to Hardcover
+      - HARDCOVER_SYNC_INTERVAL=30m #how often Hardcover is synced between library syncs, 0 for only with them
       - SKIP_TRACKING_ISBNS=<>
       - HEALTHCHECK_ID=<>
       - ABS_URL=http://audiobookshelf:80

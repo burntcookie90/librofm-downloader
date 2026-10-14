@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlin.reflect.KClass
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -96,6 +97,25 @@ class App(
         }
     }
 
+    val hardcoverInterval = serverInfo.hardcoverSyncInterval
+    if (hardcoverSync.enabled && hardcoverInterval > Duration.ZERO) {
+      appScope.launch {
+        Clock.System.fixedPeriodPulse(hardcoverInterval)
+          .beat {
+            // Both pulses count from startup, so they can fire together; give the library sync, which syncs
+            // Hardcover too, the first go.
+            delay(1.minutes)
+            supervisorScope {
+              try {
+                syncController.runIfIdle(SyncTrigger.SCHEDULED, "Hardcover sync") { hardcoverSync.syncAutomatically() }
+              } catch (e: Exception) {
+                lfdLogger.i("Hardcover sync failed: ${e.message}")
+              }
+            }
+          }
+      }
+    }
+
     setupServer(
       onUpdate = { syncController.requestSync(SyncTrigger.API, it) },
       serverInfo = serverInfo,
@@ -113,9 +133,17 @@ class App(
     healthCheckClient.startMeasureWithToken()
     libroClient.fetchLibrary()
     delay(delay)
-    processLibrary(overwrite)
-    delay(delay)
-    if (hardcoverSync.enabled) hardcoverSync.syncAutomatically()
+    // A failed download doesn't hold Hardcover back; both are reported once both have run.
+    val failures = listOfNotNull(
+      failure { processLibrary(overwrite) },
+      if (hardcoverSync.enabled) {
+        delay(delay)
+        failure { hardcoverSync.syncAutomatically() }
+      } else {
+        null
+      },
+    )
+    if (failures.isNotEmpty()) error(failures.joinToString("; ") { it.message ?: it::class.simpleName.orEmpty() })
     healthCheckClient.pingWithToken()
   }
 
@@ -180,6 +208,15 @@ class App(
       // Surface the failure so health checks and sync status reflect it. Details live on each attempt.
       error("$failed of ${statuses.size} download(s) failed")
     }
+  }
+
+  private suspend fun failure(block: suspend () -> Unit): Exception? = try {
+    block()
+    null
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    e
   }
 
   private suspend fun HealthcheckApi.pingWithToken() = withContext(ioDispatcher) {

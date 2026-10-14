@@ -24,6 +24,7 @@ import kotlinx.html.label
 import kotlinx.html.p
 import kotlinx.html.span
 import kotlinx.html.style
+import kotlin.time.Duration
 
 fun FlowContent.dashboardPage(
   stats: DashboardStats,
@@ -101,6 +102,11 @@ fun SyncTrigger.label() = when (this) {
   SyncTrigger.SCHEDULED -> "schedule"
   SyncTrigger.MANUAL -> "web UI"
   SyncTrigger.API -> "API request"
+}
+
+fun hardcoverScheduleLabel(info: ServerInfo): String {
+  val interval = info.hardcoverSyncInterval
+  return if (interval == Duration.ZERO) "With each library sync" else "Every $interval, and with each library sync"
 }
 
 fun syncIntervalLabel(interval: String) = when (interval) {
@@ -201,6 +207,8 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
           dl("kv") {
             dt { +"Mode" }
             dd { +trackerModeLabel(info.hardcoverSyncMode) }
+            dt { +"Schedule" }
+            dd { +hardcoverScheduleLabel(info) }
             if (info.audiobookshelf != null) {
               dt { +"Listening progress" }
               dd { +if (info.hardcoverSyncProgress) "Sent on every sync" else "Sent from the Hardcover page only" }
