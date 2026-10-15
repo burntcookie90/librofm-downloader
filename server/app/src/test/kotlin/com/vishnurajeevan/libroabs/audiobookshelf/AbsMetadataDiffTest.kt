@@ -67,6 +67,18 @@ class AbsMetadataDiffTest {
   }
 
   @Test
+  fun aDescriptionStoredWithEntitiesDecodedIsUnchanged() {
+    // libro.fm sends `&nbsp;`; Audiobookshelf stores the character itself.
+    val fromLibro = "<b><i>NEW YORK TIMES&nbsp;</i>BESTSELLER •&nbsp;The experts</b><br> &nbsp;<br>&ldquo;Insights&rdquo; &#8212; <i>Parents</i>"
+    val inAbs = "<b><i>NEW YORK TIMES </i>BESTSELLER • The experts</b><br />  <br />“Insights” — <i>Parents</i>"
+    val changes = metadataChanges(
+      AbsItemMetadata(title = "All Systems Red", description = inAbs),
+      AbsBookMetadata(title = "All Systems Red", authors = emptyList(), description = fromLibro),
+    )
+    assertEquals(emptyList(), changes)
+  }
+
+  @Test
   fun fieldsLibroDoesntKnowAreLeftAlone() {
     val abs = AbsItemMetadata(title = "All Systems Red", authors = listOf(AbsNamed("Martha Wells")), publisher = "Tor", subtitle = "Murderbot 1")
     val changes = metadataChanges(abs, AbsBookMetadata(title = "All Systems Red", authors = listOf("Martha Wells")))
