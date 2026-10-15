@@ -116,12 +116,33 @@ internal fun matchItem(book: Book, items: List<AbsLibraryItem>, absPath: String?
 
 private fun String.comparable() = lowercase().filter(Char::isLetterOrDigit)
 
+/**
+ * The text a reader sees, for comparing descriptions. Audiobookshelf stores entities as the characters they stand for
+ * (libro.fm's `&nbsp;` comes back as U+00A0), so entities are decoded and every kind of space counts as one.
+ */
 private fun plainText(html: String) = html
   .replace(Regex("(?i)<br\\s*/?>|</p>"), " ")
   .replace(Regex("<[^>]+>"), "")
-  .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
-  .replace("&nbsp;", " ")
-  .replace(Regex("\\s+"), " ")
+  .replace(entity) { match ->
+    val name = match.groupValues[1]
+    when {
+      name.startsWith("#x", ignoreCase = true) -> name.drop(2).toIntOrNull(16)?.let(::codePoint)
+      name.startsWith("#") -> name.drop(1).toIntOrNull()?.let(::codePoint)
+      else -> namedEntities[name]
+    } ?: match.value
+  }
+  .replace(Regex("[\\p{Z}\\s\u200B\uFEFF]+"), " ")
   .trim()
+
+private val entity = Regex("&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);")
+
+private fun codePoint(code: Int): String? = if (Character.isValidCodePoint(code)) String(Character.toChars(code)) else null
+
+private val namedEntities = mapOf(
+  "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to "\u00A0",
+  "lsquo" to "\u2018", "rsquo" to "\u2019", "ldquo" to "\u201C", "rdquo" to "\u201D",
+  "ndash" to "\u2013", "mdash" to "\u2014", "hellip" to "\u2026", "bull" to "\u2022", "middot" to "\u00B7",
+  "copy" to "\u00A9", "reg" to "\u00AE", "trade" to "\u2122", "eacute" to "\u00E9",
+)
 
 private fun String.shorten(max: Int = 240) = if (length <= max) this else take(max - 1).trimEnd() + "…"
