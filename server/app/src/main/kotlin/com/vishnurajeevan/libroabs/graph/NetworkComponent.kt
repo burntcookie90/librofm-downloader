@@ -2,13 +2,13 @@ package com.vishnurajeevan.libroabs.graph
 
 import com.vishnurajeevan.libroabs.libro.LibroAPI
 import com.vishnurajeevan.libroabs.libro.createLibroAPI
-import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.Provides
 import io.ktor.client.*
 import io.ktor.client.plugins.*

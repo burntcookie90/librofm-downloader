@@ -3,6 +3,7 @@ package com.vishnurajeevan.libroabs.storage
 import com.vishnurajeevan.libroabs.models.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -23,6 +24,7 @@ class RealStorage<T : Any>(
   private val serializer: KSerializer<T>,
   private val dispatcher: CoroutineDispatcher,
   private val logger: Logger,
+  private val dryRun: Boolean
 ) : Storage<T> {
   private val scope = CoroutineScope(dispatcher + SupervisorJob())
   private val json = Json {
@@ -31,19 +33,37 @@ class RealStorage<T : Any>(
   }
 
   private val writeQueue: MutableStateFlow<T?> = MutableStateFlow(null)
+
+  private lateinit var _dryRunData: T
+
   private var data: T
-    get() = json.decodeFromString(serializer, file.readText())
-    set(value) = file.writeText(json.encodeToString(serializer, value))
+    get() {
+      return if (dryRun) _dryRunData
+      else json.decodeFromString(serializer, file.readText())
+    }
+    set(value) {
+      if (dryRun) {
+        _dryRunData = value
+      } else {
+        file.writeText(json.encodeToString(serializer, value))
+      }
+    }
 
   private val mutex = Mutex()
 
 
   init {
     runBlocking {
-      if (!file.exists()) {
+      if (dryRun) {
+        logger.v("Dry Run: Initializing storage ${file.path}")
+        _dryRunData = initial
+      }
+      else if (!file.exists()) {
         logger.v("Creating storage for ${file.path}")
-        file.createNewFile()
-        file.writeText(json.encodeToString(serializer, initial))
+        withContext(Dispatchers.IO) {
+          file.createNewFile()
+          file.writeText(json.encodeToString(serializer, initial))
+        }
       }
     }
 
@@ -74,13 +94,15 @@ class RealStorage<T : Any>(
       serializer: KSerializer<T>,
       dispatcher: CoroutineDispatcher,
       logger: Logger,
+      dryRun: Boolean
     ): Storage<T> =
       RealStorage(
         file = file,
         initial = initial,
         serializer = serializer,
         dispatcher = dispatcher,
-        logger = logger
+        logger = logger,
+        dryRun = dryRun
       )
   }
 }

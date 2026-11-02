@@ -17,6 +17,7 @@ interface Storage<T: Any> {
       serializer: KSerializer<T>,
       dispatcher: CoroutineDispatcher,
       logger: Logger,
+      dryRun: Boolean
     ): Storage<T>
   }
 
