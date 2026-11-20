@@ -16,8 +16,7 @@ private fun Int.padToTotal(total: Int): String {
   return toString().padStart(total.toString().length, '0')
 }
 
-private fun String?.sanitizeForFilename(): String {
-  if (this == null) return "null"
+fun String.sanitizeForFilename(): String {
   return this
     .replace("\"", "\\\"") // Escape quotes
     .replace("""[<>:/\\|?*]""".toRegex(), "") // Remove other illegal characters

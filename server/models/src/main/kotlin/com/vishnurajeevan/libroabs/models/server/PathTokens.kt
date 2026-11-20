@@ -35,17 +35,17 @@ fun PathTokens.convert(book: Book): String {
       }
 }
 
-fun Book.createPath(pathPattern: String): String {
+fun Book.createPath(pathPattern: String, sanitize: (String) -> String = { it }): String {
   return pathPattern
     .split("/")
-    .mapNotNull {
-      var pathReplace = it
+    .mapNotNull { pathSegment ->
+      var resolvedSegment = pathSegment
       for (token in PathTokens.entries) {
-        if (it.contains(token.toString())) {
-          pathReplace = pathReplace.replace(token.toString(), token.convert(this)) 
+        if (pathSegment.contains(token.toString())) {
+          resolvedSegment = resolvedSegment.replace(token.toString(), token.convert(this))
         }
       }
-      pathReplace.takeIf { it != "" }
+      sanitize(resolvedSegment).takeIf { it.isNotEmpty() }
     }
     .joinToString("/")
 }
