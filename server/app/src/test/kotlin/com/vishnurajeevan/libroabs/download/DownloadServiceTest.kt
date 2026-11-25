@@ -34,6 +34,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Instant
 import java.io.File
@@ -62,6 +63,7 @@ class DownloadServiceTest {
   private val converter = FakeConverter()
   private val writer = FakeWriter()
   private val attempts = FakeAttempts()
+  private val importer = FakeImporter()
 
   private fun info(format: BookFormat = BookFormat.M4B_MP3_FALLBACK, extras: Boolean = false, renameChapters: Boolean = false) = ServerInfo(
     libroUserName = "u", libroPassword = "p", port = 0, dataDir = "", mediaDir = tmp.path, syncInterval = "d", parallelCount = 1,
@@ -71,11 +73,11 @@ class DownloadServiceTest {
     hardcoverSyncMode = TrackerSyncMode.ALL,
   )
 
-  private fun service(info: ServerInfo = info(), parallel: Int = 2) = DownloadService(
+  private fun service(info: ServerInfo = info(), parallel: Int = 2, processingScope: CoroutineScope = scope) = DownloadService(
     serverInfo = info,
     ffmpegClient = converter,
     libroClient = downloader,
-    processingScope = scope,
+    processingScope = processingScope,
     ioDispatcher = Dispatchers.IO,
     processingSemaphore = Semaphore(parallel),
     lfdLogger = object : Logger {
@@ -85,6 +87,7 @@ class DownloadServiceTest {
     attemptRepo = attempts,
     dbWriter = writer,
     targetDir = { File(tmp, it.isbn) },
+    importer = importer,
   )
 
   private fun book(isbn: String, title: String = "Book $isbn") = testBook(isbn, title)
@@ -119,6 +122,34 @@ class DownloadServiceTest {
     assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
     assertEquals(DownloadedFormat.MP3, attempts.get(r.attemptId)!!.format)
     assertTrue("mp3s" in downloader.calls)
+  }
+
+  @Test
+  fun renamingOnlyTouchesTheExtractedChapters() = await {
+    downloader.m4bAvailable = false
+    downloader.tracks = listOf(Tracks(1, "Opening"), Tracks(2, "Ending"))
+    downloader.mp3Names = listOf("part-b.mp3", "part-a.mp3")
+    val dir = File(tmp, "4").apply { mkdirs() }
+    File(dir, "cover.jpg").writeText("cover")
+    File(dir, "Extras.pdf").writeText("pdf")
+    val r = service(info(BookFormat.MP3, renameChapters = true)).enqueue(book("4", "Tale"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(
+      listOf("1 - Tale - Opening.mp3", "2 - Tale - Ending.mp3", "Extras.pdf", "cover.jpg"),
+      dir.list()!!.sorted(),
+    )
+    // chapters are assigned in name order
+    assertEquals("part-a.mp3", File(dir, "1 - Tale - Opening.mp3").readText())
+  }
+
+  @Test
+  fun chaptersAreLeftAloneWhenTheyDontMatchTheTracks() = await {
+    downloader.m4bAvailable = false
+    downloader.tracks = listOf(Tracks(1, "Opening"), Tracks(2, "Ending"))
+    downloader.mp3Names = listOf("only.mp3")
+    val r = service(info(BookFormat.MP3, renameChapters = true)).enqueue(book("5"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(listOf("only.mp3"), File(tmp, "5").list()!!.toList())
   }
 
   @Test
@@ -230,6 +261,29 @@ class DownloadServiceTest {
   }
 
   @Test
+  fun cancellingBeforeTheDownloadIsEvenDispatchedStillFinishesTheAttempt() = await {
+    // A single worker kept busy, so the download can't start before it is cancelled.
+    val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val busy = java.util.concurrent.CountDownLatch(1)
+    worker.execute { busy.await() }
+    val workerScope = CoroutineScope(SupervisorJob() + worker.asCoroutineDispatcher())
+    try {
+      val service = service(processingScope = workerScope)
+      val r = service.enqueue(book("14"), AttemptTrigger.MANUAL)
+      assertTrue(service.cancel(r.attemptId))
+      busy.countDown()
+
+      assertEquals(AttemptStatus.CANCELLED, r.result.await())
+      assertEquals(AttemptStatus.CANCELLED, attempts.get(r.attemptId)!!.status)
+      assertFalse(service.isActive("14"), "the book can be queued again")
+      assertFalse(downloader.calls.any { it.endsWith(":14") })
+    } finally {
+      workerScope.cancel()
+      worker.shutdownNow()
+    }
+  }
+
+  @Test
   fun manualDownloadsFetchExtrasButScheduledOnesLeaveThemToTheSync() = await {
     val service = service(info(extras = true))
     val manual = service.enqueue(book("9"), AttemptTrigger.MANUAL)
@@ -250,6 +304,23 @@ class DownloadServiceTest {
     assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
     val attempt = attempts.get(r.attemptId)!!
     assertTrue(attempt.error!!.contains("extras failed"), attempt.error)
+    assertEquals(1, writer.writes.filterIsInstance<DownloadItem>().size)
+  }
+
+  @Test
+  fun downloadedBooksAreImported() = await {
+    val r = service().enqueue(book("12"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    assertEquals(listOf("12"), importer.imported)
+  }
+
+  @Test
+  fun anImportFailureDoesNotFailTheBook() = await {
+    importer.failWith = java.io.IOException("Audiobookshelf answered HTTP 502")
+    val r = service().enqueue(book("13"), AttemptTrigger.MANUAL)
+    assertEquals(AttemptStatus.SUCCEEDED, r.result.await())
+    val error = attempts.get(r.attemptId)!!.error!!
+    assertTrue(error.startsWith("Book downloaded, but adding it to Audiobookshelf failed"), error)
     assertEquals(1, writer.writes.filterIsInstance<DownloadItem>().size)
   }
 

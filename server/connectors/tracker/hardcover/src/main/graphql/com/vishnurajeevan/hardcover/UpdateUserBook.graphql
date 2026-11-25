@@ -1,0 +1,6 @@
+mutation UpdateUserBook($id: Int!, $editionId: Int!, $statusId: Int!) {
+  update_user_book(id: $id, object: {edition_id: $editionId, status_id: $statusId}) {
+    id
+    error
+  }
+}

@@ -19,10 +19,12 @@ import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.BookFormat
 import com.vishnurajeevan.libroabs.models.server.TrackerSyncMode
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
+import com.vishnurajeevan.libroabs.options.AudiobookshelfOptionGroup
 import com.vishnurajeevan.libroabs.options.HardcoverOptionGroup
 import com.vishnurajeevan.libroabs.options.HealthchecksIoOptionGroup
 import dev.zacsweers.metro.createGraph
 import dev.zacsweers.metro.createGraphFactory
+import kotlin.time.Duration
 
 suspend fun main(args: Array<String>) = LibroDownloader().main(args)
 
@@ -79,6 +81,9 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
 
   private val healthChecksIoOptions by HealthchecksIoOptionGroup().cooccurring()
   private val hardcoverOptions by HardcoverOptionGroup().cooccurring()
+  private val audiobookshelfOptions by AudiobookshelfOptionGroup().cooccurring()
+  private val writeAbsMetadata by option("--write-abs-metadata", envvar = "WRITE_ABS_METADATA")
+    .flag(default = false)
   private val webhookUrls by option("--webhook-urls", envvar = "WEBHOOK_URLS").split(",")
     .default(emptyList())
 
@@ -128,7 +133,7 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       logLevel = logLevel,
       limit = limit,
       pathPattern = pathPattern,
-      healthCheckHost = healthChecksIoOptions?.healthCheckHost.orEmpty(),
+      healthCheckHost = healthChecksIoOptions?.healthCheckHost ?: "https://hc-ping.com",
       healthCheckId = healthChecksIoOptions?.healthCheckId,
       trackerToken = hardcoverOptions?.hardcoverToken,
       trackerEndpoint = hardcoverOptions?.hardcoverEndpoint.orEmpty(),
@@ -137,8 +142,12 @@ class LibroDownloader : SuspendingCliktCommand("LibroFm Downloader") {
       audioQuality = audioQuality,
       skipTrackingIsbns = skipTrackingIsbns,
       hardcoverSyncMode = hardcoverOptions?.hardcoverSyncMode ?: TrackerSyncMode.ALL,
+      hardcoverSyncProgress = hardcoverOptions?.hardcoverSyncProgress ?: false,
+      hardcoverSyncInterval = hardcoverOptions?.hardcoverSyncInterval ?: Duration.ZERO,
       webhookUrls = webhookUrls,
       webUiPassword = webUiPassword?.takeIf { it.isNotEmpty() },
+      audiobookshelf = audiobookshelfOptions?.toConfig(),
+      writeAbsMetadata = writeAbsMetadata,
     )
 
     val graph = createGraphFactory<AppComponent.Factory>().create(serverInfo)

@@ -64,6 +64,89 @@ sealed interface EnqueueOutcome {
   data class Failure(val message: String) : EnqueueOutcome
 }
 
+/** One field that syncing would change in Audiobookshelf. [key] identifies the field when choosing what to apply. */
+data class MetadataChange(val field: String, val before: String, val after: String, val key: String = field)
+
+/** What syncing a book's metadata to Audiobookshelf would do, for the user to confirm. */
+data class AbsSyncPlan(
+  val isbn: String,
+  val title: String,
+  val itemId: String,
+  val itemPath: String,
+  /** How the Audiobookshelf item was matched to the book, e.g. "ISBN". */
+  val matchedBy: String,
+  val changes: List<MetadataChange>,
+  val coverUrl: String?,
+  val hasCover: Boolean,
+)
+
+sealed interface AbsPlanResult {
+  data class Found(val plan: AbsSyncPlan) : AbsPlanResult
+  data object NotInAudiobookshelf : AbsPlanResult
+  data class Failure(val message: String) : AbsPlanResult
+}
+
+data class AbsSyncOverview(
+  /** Books whose Audiobookshelf details differ from libro.fm's. */
+  val plans: List<AbsSyncPlan>,
+  val upToDate: Int,
+  /** Titles of library books Audiobookshelf doesn't have. */
+  val notInAudiobookshelf: List<String>,
+  /** Books that couldn't be compared, with the reason. */
+  val errors: List<String> = emptyList(),
+)
+
+/** One change to make on Hardcover (or the libro.fm wishlist). [key] identifies it when choosing what to apply. */
+data class HardcoverAction(
+  val key: String,
+  val description: String,
+  /** Whether it is ticked to begin with, which is also whether the automatic sync would do it. */
+  val selected: Boolean = true,
+  /** Why it isn't ticked, or anything else worth knowing before applying it. */
+  val note: String? = null,
+)
+
+/** The Hardcover book a libro.fm book was matched to. */
+data class HardcoverMatch(
+  val title: String,
+  val url: String?,
+  /** "ISBN", or how the title search matched. */
+  val matchedBy: String,
+  /** Hardcover has no edition with this ISBN yet; applying adds one. */
+  val createsEdition: Boolean,
+)
+
+data class HardcoverBookPlan(
+  val isbn: String,
+  val title: String,
+  val author: String?,
+  val match: HardcoverMatch?,
+  val actions: List<HardcoverAction>,
+)
+
+data class HardcoverOverview(
+  /** Identifies this preview, so applying does exactly what was shown. */
+  val planId: String,
+  val books: List<HardcoverBookPlan>,
+  val upToDate: Int,
+  /** Titles Hardcover doesn't seem to have. */
+  val notFound: List<String>,
+  val errors: List<String> = emptyList(),
+  /** Want to Read titles libro.fm doesn't sell, in any of their audiobook editions. */
+  val notOnLibro: List<String> = emptyList(),
+  /** Audiobookshelf is configured, so listening progress is compared. */
+  val progressCompared: Boolean = false,
+  /** HARDCOVER_SYNC_PROGRESS is on. */
+  val progressSyncedAutomatically: Boolean = false,
+)
+
+data class HardcoverApplyResult(
+  val applied: Int,
+  val failures: List<Pair<String, String>>,
+  /** The preview was too old to apply; compare again. */
+  val expired: Boolean = false,
+)
+
 /**
  * Everything the web UI needs from the rest of the application.
  */
@@ -100,6 +183,38 @@ interface WebUiBackend {
   suspend fun forgetDownload(isbn: String)
   suspend fun deleteAttempt(attemptId: Long): Boolean
   suspend fun clearAttempts(olderThanDays: Int?): Int
+
+  /** Whether Audiobookshelf is configured, so its metadata can be compared and synced. */
+  val audiobookshelfEnabled: Boolean get() = false
+
+  /** Compares one book's Audiobookshelf details with libro.fm's. Changes nothing. */
+  suspend fun absPlan(isbn: String): AbsPlanResult = AbsPlanResult.NotInAudiobookshelf
+
+  /** Compares every library book with Audiobookshelf. Changes nothing. */
+  suspend fun absPlanAll(): AbsSyncOverview = AbsSyncOverview(emptyList(), 0, emptyList())
+
+  /**
+   * Gives Audiobookshelf item [itemId] libro.fm's metadata for [isbn], limited to the [fields] (change keys) chosen;
+   * `null` applies everything. Returns an error message on failure.
+   */
+  suspend fun absApply(isbn: String, itemId: String, fields: Set<String>?, replaceCover: Boolean): String? =
+    "Audiobookshelf is not configured"
+
+  /** The fields that can be chosen when applying, as (key, label). */
+  val absFields: List<Pair<String, String>> get() = emptyList()
+
+  /** An Audiobookshelf item's current cover and its content type. */
+  suspend fun absCover(itemId: String): Pair<ByteArray, String>? = null
+
+  /** Whether HARDCOVER_TOKEN is set. */
+  val hardcoverEnabled: Boolean get() = false
+
+  /** Works out what syncing with Hardcover would change. Changes nothing. */
+  suspend fun hardcoverPlan(): HardcoverOverview = HardcoverOverview("", emptyList(), 0, emptyList())
+
+  /** Applies the actions with these keys from the preview [planId]. */
+  suspend fun hardcoverApply(planId: String, keys: Set<String>): HardcoverApplyResult =
+    HardcoverApplyResult(0, emptyList(), expired = true)
 
   fun syncSnapshot(): SyncSnapshot
   fun requestSync(overwrite: Boolean): Boolean

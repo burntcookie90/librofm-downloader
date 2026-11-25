@@ -1,9 +1,9 @@
 package com.vishnurajeevan.libroabs.models.server
 
 import dev.zacsweers.redacted.annotations.Redacted
-import kotlinx.serialization.Serializable
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
-@Serializable
 data class ServerInfo(
   val libroUserName: String,
   @Redacted val libroPassword: String,
@@ -33,7 +33,17 @@ data class ServerInfo(
   val libroFmHeaders: Map<String, String> = emptyMap(),
   /** When set, the web UI and API require this password. */
   @Redacted val webUiPassword: String? = null,
+  /** Adds every downloaded book to Audiobookshelf when set. */
+  val audiobookshelf: AudiobookshelfConfig? = null,
+  /** Writes `metadata.json` and `cover.jpg` next to each book even without [audiobookshelf]. */
+  val writeAbsMetadata: Boolean = false,
+  /** Sends Audiobookshelf listening progress to Hardcover on every sync. */
+  val hardcoverSyncProgress: Boolean = false,
+  /** How often Hardcover is synced between library syncs; [Duration.ZERO] syncs it only with the library. */
+  val hardcoverSyncInterval: Duration = 30.minutes,
 ) {
+  val writesAbsMetadataFiles: Boolean get() = writeAbsMetadata || audiobookshelf != null
+
   fun prettyPrint(): String {
     return """
       |Server Info:
@@ -50,12 +60,16 @@ data class ServerInfo(
       |  Limit: $limit
       |  Path Pattern: $pathPattern
       |  Health Check Host: $healthCheckHost
-      |  Health Check ID: $healthCheckId
+      |  Health Check: ${if (healthCheckId.isNullOrEmpty()) "Disabled" else "Enabled"}
       |  Tracker Enabled: ${!trackerToken.isNullOrEmpty()} 
       |  Tracker sync mode: $hardcoverSyncMode
-      |  Webhook Urls: $webhookUrls,
-      |  LibroFM Headers: $libroFmHeaders
+      |  Tracker progress sync: $hardcoverSyncProgress
+      |  Tracker sync interval: ${if (hardcoverSyncInterval == Duration.ZERO) "with library sync" else hardcoverSyncInterval}
+      |  Webhooks: ${webhookUrls.map(::webhookHost)}
+      |  LibroFM Headers: ${libroFmHeaders.keys}
       |  Web UI Password Protected: ${!webUiPassword.isNullOrEmpty()}
+      |  Audiobookshelf: ${audiobookshelf?.let { "${webhookHost(it.url)} (${it.mode})" } ?: "Disabled"}
+      |  Audiobookshelf Metadata Files: $writesAbsMetadataFiles
     """.trimMargin()
   }
 }

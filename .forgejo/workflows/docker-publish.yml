@@ -1,0 +1,131 @@
+name: Docker
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  REGISTRY: git.lumu.au
+  PACKAGE_OWNER: luke
+  PACKAGE_NAME: librofm-downloader
+  REPOSITORY_NAME: librofm-downloader
+  DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
+
+jobs:
+  test:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - run: ./gradlew test
+
+  build-and-push:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: docker
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Prepare image tags
+        id: meta
+        shell: sh
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+
+          image="${REGISTRY}/${PACKAGE_OWNER}/${PACKAGE_NAME}"
+          short_sha="$(printf '%s' "${{ github.sha }}" | cut -c 1-12)"
+
+          {
+            echo "image=${image}"
+            echo "sha_tag=${image}:sha-${short_sha}"
+            echo "latest_tag=${image}:latest"
+            echo "ref_name=${{ github.ref_name }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Forgejo container registry
+        shell: sh
+        run: |
+          docker logout "$REGISTRY" >/dev/null 2>&1 || true
+
+          printf '%s' "${{ secrets.FORGEJO_REGISTRY_TOKEN }}" \
+            | docker login "$REGISTRY" \
+              --username "${{ secrets.FORGEJO_REGISTRY_USERNAME }}" \
+              --password-stdin
+
+      - name: Build image
+        shell: sh
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://${REGISTRY}/${PACKAGE_OWNER}/${REPOSITORY_NAME}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --tag "${{ steps.meta.outputs.sha_tag }}" \
+            .
+
+      - name: Tag latest on main
+        if: github.ref == 'refs/heads/main'
+        shell: sh
+        run: |
+          docker tag "${{ steps.meta.outputs.sha_tag }}" "${{ steps.meta.outputs.latest_tag }}"
+
+      - name: Tag release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: sh
+        run: |
+          docker tag "${{ steps.meta.outputs.sha_tag }}" "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.ref_name }}"
+
+      - name: Push image tags
+        shell: sh
+        run: |
+          docker push "${{ steps.meta.outputs.sha_tag }}"
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            docker push "${{ steps.meta.outputs.latest_tag }}"
+          fi
+
+          case "${{ github.ref }}" in
+            refs/tags/*)
+              docker push "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.ref_name }}"
+              ;;
+          esac
+
+      - name: Link package to repository
+        shell: sh
+        run: |
+          status="$(
+            curl -sS -o /tmp/link-package-response.txt -w '%{http_code}' \
+              --user "${{ secrets.FORGEJO_REGISTRY_USERNAME }}:${{ secrets.FORGEJO_REGISTRY_TOKEN }}" \
+              --request POST \
+              "https://${REGISTRY}/api/v1/packages/${PACKAGE_OWNER}/container/${PACKAGE_NAME}/-/link/${REPOSITORY_NAME}"
+          )"
+
+          case "$status" in
+            200|201|204|409)
+              echo "Package link accepted with HTTP ${status}"
+              ;;
+            400)
+              if grep -q '"invalid argument"' /tmp/link-package-response.txt; then
+                echo "Forgejo reports the package already has a repository link"
+              else
+                echo "Package link failed with HTTP ${status}" >&2
+                cat /tmp/link-package-response.txt >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Package link failed with HTTP ${status}" >&2
+              cat /tmp/link-package-response.txt >&2
+              exit 1
+              ;;
+          esac

@@ -1,0 +1,17 @@
+query MyUserBooks($bookIds: [Int!]!) {
+  me {
+    user_books(where: {book_id: {_in: $bookIds}}) {
+      id
+      book_id
+      status_id
+      edition_id
+      user_book_reads(order_by: {id: desc}) {
+        id
+        started_at
+        finished_at
+        progress_seconds
+        edition_id
+      }
+    }
+  }
+}

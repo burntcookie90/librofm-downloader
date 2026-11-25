@@ -5,6 +5,7 @@ import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Chapter
 import com.vishnurajeevan.libroabs.models.libro.Tracks
+import com.vishnurajeevan.libroabs.models.server.toSafePathSegment
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -39,7 +40,7 @@ class FfmpegClient(
   private val ffprobe = FFprobe(ffprobePath)
 
   override suspend fun convertBookToM4b(book: Book, tracks: List<Tracks>, targetDirectory: File, audioQuality: String) {
-    val newFile = File(targetDirectory, "${book.title}.m4b")
+    val newFile = File(targetDirectory, "${book.title.toSafePathSegment()}.m4b")
 
     // Download Cover Image
     val coverFile = File(targetDirectory, "cover.jpg")
@@ -67,6 +68,7 @@ class FfmpegClient(
       .addExtraArgs("-i", listFile.absolutePath)
       .addExtraArgs("-f", "ffmetadata", "-i", metadataFile.absolutePath)
       .addInput(coverFile.absolutePath)
+      .done()
       .addOutput(newFile.absolutePath)
       .setAudioCodec("aac")
       .addExtraArgs("-b:a", audioQuality)

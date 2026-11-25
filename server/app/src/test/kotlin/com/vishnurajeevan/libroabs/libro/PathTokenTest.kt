@@ -183,4 +183,10 @@ class PathTokenTest {
       }
     )
   }
+
+  @Test
+  fun metadataCannotAddOrClimbDirectories() {
+    val book = singleAuthorBook.copy(title = "AC/DC: Live\\Loud", authors = listOf(".."), series = "../../etc")
+    assertEquals("__/..-..-etc/AC-DC: Live-Loud", book.createPath("FIRST_AUTHOR/SERIES_NAME/BOOK_TITLE"))
+  }
 }

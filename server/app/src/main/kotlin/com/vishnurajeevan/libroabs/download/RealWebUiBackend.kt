@@ -1,5 +1,10 @@
 package com.vishnurajeevan.libroabs.download
 
+import com.vishnurajeevan.libroabs.audiobookshelf.AbsMetadataSync
+import com.vishnurajeevan.libroabs.audiobookshelf.absFieldChoices
+import com.vishnurajeevan.libroabs.server.ui.AbsPlanResult
+import com.vishnurajeevan.libroabs.server.ui.AbsSyncOverview
+import java.io.File
 import com.vishnurajeevan.libroabs.db.repo.AttemptPage
 import com.vishnurajeevan.libroabs.db.repo.DownloadAttemptRepo
 import com.vishnurajeevan.libroabs.db.repo.DownloadHistoryRepo
@@ -20,6 +25,9 @@ import com.vishnurajeevan.libroabs.server.ui.ActiveAttempt
 import com.vishnurajeevan.libroabs.server.ui.BookState
 import com.vishnurajeevan.libroabs.server.ui.DashboardStats
 import com.vishnurajeevan.libroabs.server.ui.EnqueueOutcome
+import com.vishnurajeevan.libroabs.server.ui.HardcoverApplyResult
+import com.vishnurajeevan.libroabs.server.ui.HardcoverOverview
+import com.vishnurajeevan.libroabs.tracker.HardcoverSync
 import com.vishnurajeevan.libroabs.server.ui.LibraryEntry
 import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
 import com.vishnurajeevan.libroabs.server.ui.WishlistOverview
@@ -42,7 +50,61 @@ class RealWebUiBackend(
   private val dbWriter: DbWriter,
   private val libroWishlistRepo: LibroFmWishlistSyncStatusRepo,
   private val trackerWishlistRepo: TrackerWishlistSyncStatusRepo,
+  private val absMetadataSync: AbsMetadataSync,
+  private val hardcoverSync: HardcoverSync,
 ) : WebUiBackend {
+
+  override val hardcoverEnabled: Boolean get() = hardcoverSync.enabled
+
+  override suspend fun hardcoverPlan(): HardcoverOverview = hardcoverSync.preview()
+
+  override suspend fun hardcoverApply(planId: String, keys: Set<String>): HardcoverApplyResult =
+    hardcoverSync.apply(planId, keys)
+
+  override val audiobookshelfEnabled: Boolean get() = serverInfo.audiobookshelf != null
+
+  /** Where this app saved each book it downloaded. */
+  private suspend fun downloadDirs(): Map<String, File> =
+    downloadHistoryRepo.downloadHistory().associate { it.isbn to File(it.path) }
+
+  override suspend fun absPlan(isbn: String): AbsPlanResult {
+    val book = libroClient.getLocalLibrary().audiobooks.firstOrNull { it.isbn == isbn }
+      ?: return AbsPlanResult.Failure("Book not found")
+    return try {
+      absMetadataSync.plan(book, downloadDirs()[isbn])
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      AbsPlanResult.Failure(e.describe())
+    }
+  }
+
+  override suspend fun absPlanAll(): AbsSyncOverview {
+    val dirs = downloadDirs()
+    return absMetadataSync.planAll(libroClient.getLocalLibrary().audiobooks.map { it to dirs[it.isbn] })
+  }
+
+  override val absFields: List<Pair<String, String>> get() = absFieldChoices
+
+  override suspend fun absApply(isbn: String, itemId: String, fields: Set<String>?, replaceCover: Boolean): String? {
+    val book = libroClient.getLocalLibrary().audiobooks.firstOrNull { it.isbn == isbn } ?: return "Book not found"
+    return try {
+      absMetadataSync.apply(book, downloadDirs()[isbn], itemId, fields, replaceCover)
+      null
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      e.describe()
+    }
+  }
+
+  override suspend fun absCover(itemId: String): Pair<ByteArray, String>? = try {
+    absMetadataSync.cover(itemId)
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    null
+  }
 
   override suspend fun libraryEntries(): List<LibraryEntry> {
     val books = libroClient.getLocalLibrary().audiobooks

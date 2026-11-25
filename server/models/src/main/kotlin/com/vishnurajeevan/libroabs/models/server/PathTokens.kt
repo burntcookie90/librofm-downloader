@@ -42,7 +42,7 @@ fun Book.createPath(pathPattern: String): String {
       var pathReplace = it
       for (token in PathTokens.entries) {
         if (it.contains(token.toString())) {
-          pathReplace = pathReplace.replace(token.toString(), token.convert(this)) 
+          pathReplace = pathReplace.replace(token.toString(), token.convert(this).toSafePathSegment())
         }
       }
       pathReplace.takeIf { it != "" }

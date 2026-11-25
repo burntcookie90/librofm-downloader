@@ -24,6 +24,7 @@ import kotlinx.html.label
 import kotlinx.html.p
 import kotlinx.html.span
 import kotlinx.html.style
+import kotlin.time.Duration
 
 fun FlowContent.dashboardPage(
   stats: DashboardStats,
@@ -103,6 +104,11 @@ fun SyncTrigger.label() = when (this) {
   SyncTrigger.API -> "API request"
 }
 
+fun hardcoverScheduleLabel(info: ServerInfo): String {
+  val interval = info.hardcoverSyncInterval
+  return if (interval == Duration.ZERO) "With each library sync" else "Every $interval, and with each library sync"
+}
+
 fun syncIntervalLabel(interval: String) = when (interval) {
   "h" -> "every hour"
   "d" -> "every day"
@@ -180,6 +186,13 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
     attributes["hx-trigger"] = if (sync.running) "every 2s" else "every 15s"
     attributes["hx-swap"] = "outerHTML"
     div("card") { syncSummary(sync, info, view = "sync") }
+    if (info.audiobookshelf != null) {
+      div("card") {
+        h2 { +"Audiobookshelf metadata" }
+        p("muted small") { +"Compare your library's details in Audiobookshelf with libro.fm's, and choose which books to update." }
+        a("/ui/audiobookshelf", classes = "btn small") { +"Compare library" }
+      }
+    }
     div("grid two") {
       div("card") {
         h2 { +"libro.fm wishlist" }
@@ -194,7 +207,14 @@ fun FlowContent.syncPanel(sync: SyncSnapshot, info: ServerInfo, wishlist: Wishli
           dl("kv") {
             dt { +"Mode" }
             dd { +trackerModeLabel(info.hardcoverSyncMode) }
+            dt { +"Schedule" }
+            dd { +hardcoverScheduleLabel(info) }
+            if (info.audiobookshelf != null) {
+              dt { +"Listening progress" }
+              dd { +if (info.hardcoverSyncProgress) "Sent on every sync" else "Sent from the Hardcover page only" }
+            }
           }
+          a("/ui/hardcover", classes = "btn small") { +"Preview changes" }
           h3 { +"Wishlist items synced" }
           syncedList(wishlist.trackerSynced, "No wishlist books have been synced.")
         }
@@ -269,6 +289,8 @@ fun FlowContent.settingsPage(info: ServerInfo) {
       "Tracker sync mode" to trackerModeLabel(info.hardcoverSyncMode),
       "Skipped ISBNs" to info.skipTrackingIsbns.joinToString(", ").ifEmpty { "None" },
       "Health check" to if (info.healthCheckId.isNullOrEmpty()) "Disabled" else "${info.healthCheckHost}/…",
+      "Audiobookshelf" to (info.audiobookshelf?.let { "${it.url.substringAfter("://").substringBefore('/')} (${it.mode.name.lowercase()})" }
+        ?: if (info.writesAbsMetadataFiles) "Metadata files only" else "Disabled"),
       "Webhooks" to (info.webhookUrls.joinToString(", ") { it.substringAfter("://").substringBefore('/') }.ifEmpty { "None" }),
     )
     settingsCard(

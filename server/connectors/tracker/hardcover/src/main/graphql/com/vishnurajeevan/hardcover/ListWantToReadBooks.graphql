@@ -1,10 +1,12 @@
 query MyWantToRead {
   me {
     user_books(where: {status_id: {_eq: 1} }) {
+      edition_id
       book {
         id
         title
         editions(where: {reading_format: {format: { _eq:"Listened"}}}) {
+          id
           reading_format {
             id
             format

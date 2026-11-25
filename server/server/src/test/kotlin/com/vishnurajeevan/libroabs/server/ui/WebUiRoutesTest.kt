@@ -14,6 +14,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.parameters
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
@@ -442,6 +445,14 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun sessionCookieIsSecureBehindAnHttpsProxy() = ui(backend("pw")) {
+    val direct = browser().submitForm("/ui/login", parameters { append("password", "pw") })
+    assertFalse(direct.headers[HttpHeaders.SetCookie].orEmpty().contains("Secure"))
+    val proxied = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("X-Forwarded-Proto", "https") }
+    assertContains(proxied.headers[HttpHeaders.SetCookie].orEmpty(), "Secure")
+  }
+
+  @Test
   fun loginIgnoresOpenRedirects() = ui(backend("pw")) {
     val login = browser().submitForm("/ui/login", parameters {
       append("password", "pw")
@@ -459,6 +470,63 @@ class WebUiRoutesTest {
   }
 
   @Test
+  fun repeatedWrongApiKeysLockOutPasswordsButNotSessions() = ui(backend("pw")) {
+    val client = browser()
+    assertEquals(HttpStatusCode.Found, client.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    val api = browser()
+    repeat(5) { api.get("/ui/queue") { header("X-Api-Key", "guess-$it") } }
+    assertEquals(HttpStatusCode.Found, api.get("/ui/queue") { header("X-Api-Key", "pw") }.status)
+    assertEquals(HttpStatusCode.TooManyRequests, api.submitForm("/ui/login", parameters { append("password", "pw") }).status)
+    // an existing session keeps working
+    assertEquals(HttpStatusCode.OK, client.get("/ui/queue").status)
+  }
+
+  @Test
+  fun apiRefusesRequestsMadeByOtherSites() = try {
+    testApplication {
+      application {
+        installWebUi(backend())
+        routing { get("/update") { call.respondText("updating") } }
+      }
+      val client = browser()
+      assertEquals(HttpStatusCode.OK, client.get("/update").status, "scripts send no fetch metadata")
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header("Sec-Fetch-Site", "none") }.status, "typed into the address bar")
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header("Sec-Fetch-Site", "same-origin") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header("Sec-Fetch-Site", "cross-site") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header("Sec-Fetch-Site", "same-site") }.status)
+      assertEquals(HttpStatusCode.Forbidden, client.get("/update") { header(HttpHeaders.Origin, "https://evil.example") }.status)
+      assertEquals(HttpStatusCode.OK, client.get("/update") { header(HttpHeaders.Origin, "http://localhost") }.status)
+      // links from other sites into the UI still work
+      assertEquals(HttpStatusCode.OK, client.get("/ui") { header("Sec-Fetch-Site", "cross-site") }.status)
+    }
+  } finally {
+    scope.cancel()
+  }
+
+  @Test
+  fun errorsDoNotRevealExceptionDetails() = try {
+    testApplication {
+      application {
+        installWebUi(backend())
+        routing { get("/ui/boom") { error("/secret/path/data.db is locked") } }
+      }
+      val page = browser().get("/ui/boom")
+      assertEquals(HttpStatusCode.InternalServerError, page.status)
+      assertFalse(page.bodyAsText().contains("/secret/path"))
+      val htmx = browser().htmxGet("/ui/boom")
+      assertFalse(htmx.headers["HX-Trigger"].orEmpty().contains("secret"))
+    }
+  } finally {
+    scope.cancel()
+  }
+
+  @Test
+  fun otherSitesCannotPostToTheLoginForm() = ui(backend("pw")) {
+    val response = browser().submitForm("/ui/login", parameters { append("password", "pw") }) { header("Sec-Fetch-Site", "cross-site") }
+    assertEquals(HttpStatusCode.Forbidden, response.status)
+  }
+
+  @Test
   fun forgedSessionCookieIsRejected() = ui(backend("pw")) {
     val client = browser()
     val response = client.get("/ui/queue") { header(HttpHeaders.Cookie, "libro_session=99999999999.AAAA") }
@@ -471,5 +539,95 @@ class WebUiRoutesTest {
     assertEquals(HttpStatusCode.OK, client.get("/ui/queue").status)
     assertEquals(HttpStatusCode.Forbidden, client.post("/ui/queue/download-missing").status)
     assertFalse(client.get("/ui").bodyAsText().contains("Log out"))
+  }
+
+  // ---- audiobookshelf ----
+
+  private fun samplePlan(
+    isbn: String,
+    changes: List<MetadataChange> = listOf(
+      MetadataChange("Narrators", "—", "Kevin R. Free", "NARRATORS"),
+      MetadataChange("Series", "—", "A Titanium Noir novel", "SERIES"),
+    ),
+  ) =
+    AbsSyncPlan(isbn, "All Systems Red", "item-1", "/books/Martha Wells/All Systems Red", "ISBN", changes, "https://covers.example/1.jpg", hasCover = true)
+
+  @Test
+  fun audiobookshelfIsHiddenWhenNotConfigured() = ui(backend()) {
+    val client = browser()
+    val isbn = sampleBook(1).isbn
+    assertFalse(client.get("/ui/book/$isbn").bodyAsText().contains("Compare with Audiobookshelf"))
+    assertEquals(HttpStatusCode.NotFound, client.get("/ui/audiobookshelf").status)
+    assertEquals(HttpStatusCode.NotFound, client.htmxPost("/ui/book/$isbn/abs/apply", mapOf("itemId" to listOf("item-1"))).status)
+  }
+
+  @Test
+  fun aBookShowsItsDifferencesBeforeAnythingIsApplied() {
+    val backend = backend().apply { absEnabled = true; absPlans = { AbsPlanResult.Found(samplePlan(it)) } }
+    ui(backend) {
+      val client = browser()
+      val isbn = sampleBook(1).isbn
+      assertContains(client.get("/ui/book/$isbn").bodyAsText(), "Compare with Audiobookshelf")
+
+      val diff = client.htmxGet("/ui/book/$isbn/abs").bodyAsText()
+      assertContains(diff, "Kevin R. Free")
+      assertContains(diff, "/books/Martha Wells/All Systems Red")
+      assertContains(diff, "/ui/audiobookshelf/cover/item-1")
+      assertContains(diff, "name=\"field\" value=\"SERIES\"")
+      assertTrue(backend.absApplied.isEmpty(), "comparing changes nothing")
+
+      // The series is unticked: only the narrators are applied.
+      val applied = client.htmxPost(
+        "/ui/book/$isbn/abs/apply",
+        mapOf("itemId" to listOf("item-1"), "cover" to listOf("on"), "field" to listOf("NARRATORS")),
+      )
+      assertEquals(HttpStatusCode.OK, applied.status)
+      assertContains(applied.headers["HX-Trigger"].orEmpty(), "Updated in Audiobookshelf.")
+      assertEquals(listOf(FakeBackend.AbsApplied(isbn, "item-1", setOf("NARRATORS"), true)), backend.absApplied)
+    }
+  }
+
+  @Test
+  fun applyRefusesOddItemIds() {
+    val backend = backend().apply { absEnabled = true }
+    ui(backend) {
+      val r = browser().htmxPost("/ui/book/${sampleBook(1).isbn}/abs/apply", mapOf("itemId" to listOf("../libraries/x")))
+      assertEquals(HttpStatusCode.BadRequest, r.status)
+      assertTrue(backend.absApplied.isEmpty())
+    }
+  }
+
+  @Test
+  fun theLibraryComparisonAppliesOnlyTheSelectedBooks() {
+    val backend = backend().apply {
+      absEnabled = true
+      absOverviewResult = AbsSyncOverview(listOf(samplePlan("1"), samplePlan("2")), upToDate = 5, notInAudiobookshelf = listOf("Missing Book"))
+      absApplyError = null
+    }
+    ui(backend) {
+      val client = browser()
+      assertContains(client.get("/ui/audiobookshelf").bodyAsText(), "/ui/audiobookshelf/compare")
+      val overview = client.htmxGet("/ui/audiobookshelf/compare").bodyAsText()
+      assertContains(overview, "1|item-1")
+      assertContains(overview, "Missing Book")
+      assertContains(overview, "up to date")
+      assertContains(overview, "name=\"field\" value=\"SERIES\"")
+      assertFalse(overview.contains("value=\"CHAPTERS\""), "only fields that differ somewhere are offered")
+
+      val r = client.htmxPost("/ui/audiobookshelf/apply", mapOf("item" to listOf("2|item-1"), "field" to listOf("NARRATORS")))
+      assertContains(r.bodyAsText(), "Updated 1 book in Audiobookshelf.")
+      assertEquals(listOf(FakeBackend.AbsApplied("2", "item-1", setOf("NARRATORS"), false)), backend.absApplied)
+    }
+  }
+
+  @Test
+  fun audiobookshelfCoversAreProxied() {
+    val backend = backend().apply { absEnabled = true }
+    ui(backend) {
+      val client = browser()
+      val cover = client.get("/ui/audiobookshelf/cover/item-1")
+      assertEquals(ContentType.Image.JPEG, cover.contentType())
+      assertEquals(HttpStatusCode.NotFound, client.get("/ui/audiobookshelf/cover/item-2").status)
+    }
   }
 }

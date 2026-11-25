@@ -27,6 +27,15 @@ RUN apk add --no-cache \
  && rm -rf /var/cache/* \
  && mkdir /var/cache/apk
 
+# Run as an unprivileged user. Override with `user:` (compose) or `--user` to match the owner of your volumes;
+# any UID works, as long as it can write to /data and /media.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN addgroup -S -g "$APP_GID" libro \
+ && adduser -S -D -H -h /app -s /sbin/nologin -u "$APP_UID" -G libro libro \
+ && mkdir -p /data /media \
+ && chown libro:libro /data /media
+
 ENV \
     JAVA_OPTS="-Xmx4G" \
     LIBRO_FM_USERNAME="" \
@@ -49,6 +58,8 @@ ENV \
 WORKDIR /app
 COPY scripts/run.sh ./
 COPY --from=build /app/server/app/build/install/app ./
+
+USER ${APP_UID}:${APP_GID}
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/app/run.sh"]

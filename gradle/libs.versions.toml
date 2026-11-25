@@ -1,28 +1,28 @@
 [versions]
-apollo = "4.4.1"
+apollo = "5.2.0"
 cardiologist = "0.8.0"
 clikt = "5.1.0"
-ffmpeg = "0.8.0"
+ffmpeg = "0.9.2"
 jaudiotagger = "3.0.1"
 junit = "4.13.2"
-ksp = "2.3.10"
-kotlin = "2.4.0"
-kotlinxDateTime = "0.7.1-0.6.x-compat"
+ksp = "2.3.12"
+kotlin = "2.4.21"
+kotlinxDateTime = "0.8.0-0.6.x-compat"
 kotlinxSerializationJson = "1.11.0"
-kotlinxIo = "0.9.0"
-ktor = "3.5.1"
+kotlinxIo = "0.9.1"
+ktor = "3.6.0"
 ktorfit = "2.7.5"
 metro = "1.4.5"
-logback = "1.5.32"
+logback = "1.6.5"
 redacted = "1.18.0"
-sqldelight = "2.3.2"
+sqldelight = "2.4.1"
 
 jdk = "21"
 jvmTarget = "21"
 
 [libraries]
 apollo-runtime = { module = "com.apollographql.apollo:apollo-runtime", version.ref = "apollo" }
-apollo-adapters-kotlinx-datetime = "com.apollographql.adapters:apollo-adapters-kotlinx-datetime:0.7.0"
+apollo-adapters-kotlinx-datetime = "com.apollographql.adapters:apollo-adapters-kotlinx-datetime:0.8.0"
 
 cardiologist = { module = "io.github.kevincianfarini.cardiologist:cardiologist", version.ref = "cardiologist" }
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
@@ -31,7 +31,7 @@ kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotl
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 jaudiotagger = { module = "net.jthink:jaudiotagger", version.ref = "jaudiotagger" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.2"}
+kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0"}
 kotlinx-io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDateTime" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
@@ -39,6 +39,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-content-negotiation= { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-html = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor" }
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }

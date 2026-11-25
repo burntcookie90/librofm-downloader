@@ -44,6 +44,9 @@ internal class FakeLibroFm : LibroFmBooks {
   @Volatile var m4bAvailable = true
   @Volatile var failMp3With: Throwable? = null
   @Volatile var failExtras = false
+  @Volatile var tracks: List<Tracks> = listOf(Tracks(1, "One"))
+  /** Files the fake "extracts" into the book folder when MP3s are downloaded. */
+  @Volatile var mp3Names: List<String> = emptyList()
   @Volatile var gate: CompletableDeferred<Unit>? = null
   val concurrent = AtomicInteger(0)
   val maxConcurrent = AtomicInteger(0)
@@ -53,7 +56,7 @@ internal class FakeLibroFm : LibroFmBooks {
 
   override suspend fun fetchMp3DownloadMetadata(isbn: String): Mp3DownloadMetadata {
     calls += "mp3meta:$isbn"
-    return Mp3DownloadMetadata(listOf(DownloadPart("https://x/part.zip", 1)), listOf(Tracks(1, "One")))
+    return Mp3DownloadMetadata(listOf(DownloadPart("https://x/part.zip", 1)), tracks)
   }
 
   override suspend fun fetchM4bMetadata(isbn: String): Result<M4bMetadata> {
@@ -72,9 +75,10 @@ internal class FakeLibroFm : LibroFmBooks {
     }
   }
 
-  override suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File) {
+  override suspend fun downloadMp3s(data: List<DownloadPart>, targetDirectory: File): List<File> {
     calls += "mp3s"
     failMp3With?.let { throw it }
+    return mp3Names.map { File(targetDirectory, it).apply { writeText(it) } }
   }
 
   override suspend fun downloadPdfExtras(isbn: String, data: List<PdfExtra>, targetDirectory: File) {
@@ -160,4 +164,15 @@ internal class FakeAttempts : DownloadAttemptRepo {
   }
 
   override suspend fun deleteFinished(id: Long) = rows.removeIf { it.id == id && !it.status.isActive }
+}
+
+internal class FakeImporter : com.vishnurajeevan.libroabs.audiobookshelf.LibraryImporter {
+  override var enabled = true
+  @Volatile var failWith: Throwable? = null
+  val imported = CopyOnWriteArrayList<String>()
+
+  override suspend fun import(book: Book, directory: File) {
+    failWith?.let { throw it }
+    imported += book.isbn
+  }
 }

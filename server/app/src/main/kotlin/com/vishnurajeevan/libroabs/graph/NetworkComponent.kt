@@ -2,6 +2,7 @@ package com.vishnurajeevan.libroabs.graph
 
 import com.vishnurajeevan.libroabs.libro.LibroAPI
 import com.vishnurajeevan.libroabs.libro.createLibroAPI
+import com.vishnurajeevan.libroabs.libro.configureLibroApi
 import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.server.ApplicationLogLevel
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
@@ -31,8 +32,8 @@ interface NetworkComponent {
         override fun log(message: String) {
           _logger.v(message)
         }
-
       }
+      sanitizeHeader { it == HttpHeaders.Authorization || serverInfo.libroFmHeaders.keys.any { key -> key.equals(it, ignoreCase = true) } }
       level = when (serverInfo.logLevel) {
         ApplicationLogLevel.NONE -> LogLevel.NONE
         ApplicationLogLevel.INFO -> LogLevel.INFO
@@ -44,28 +45,18 @@ interface NetworkComponent {
   @Provides
   @Named("download")
   fun downloadClient(client: HttpClient): HttpClient = client.config {
+    // No overall limit: a large M4B on a slow line can take far longer than any fixed time. A connection that stops
+    // sending data is still caught, and downloadTo retries it.
     install(HttpTimeout) {
-      requestTimeoutMillis = 5 * 60 * 1000
+      connectTimeoutMillis = 30_000
+      socketTimeoutMillis = 60_000
     }
   }
 
   @Provides
   fun libroApi(client: HttpClient, serverInfo: ServerInfo): LibroAPI = Ktorfit.Builder()
     .baseUrl("https://libro.fm/")
-    .httpClient(client.config {
-      defaultRequest {
-        contentType(ContentType.Application.Json)
-        serverInfo.libroFmHeaders.forEach { key, value ->
-          header(key, value)
-        }
-      }
-      install(ContentNegotiation) {
-        json(Json {
-          isLenient = true
-          ignoreUnknownKeys = true
-        })
-      }
-    })
+    .httpClient(client.config { configureLibroApi(serverInfo.libroFmHeaders) })
     .converterFactories(ResponseConverterFactory())
     .build()
     .createLibroAPI()
