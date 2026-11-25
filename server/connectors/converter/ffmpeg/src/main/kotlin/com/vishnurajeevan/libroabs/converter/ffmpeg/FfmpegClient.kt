@@ -1,7 +1,6 @@
 package com.vishnurajeevan.libroabs.converter.ffmpeg
 
 import com.vishnurajeevan.libroabs.models.Logger
-import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.libro.Book
 import com.vishnurajeevan.libroabs.models.libro.Chapter
 import com.vishnurajeevan.libroabs.models.libro.Tracks
@@ -9,6 +8,7 @@ import com.vishnurajeevan.libroabs.models.server.toSafePathSegment
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.datetime.TimeZone

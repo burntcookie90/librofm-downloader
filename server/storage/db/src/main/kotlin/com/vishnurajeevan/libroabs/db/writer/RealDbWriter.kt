@@ -9,6 +9,7 @@ import com.vishnurajeevan.libroabs.models.graph.Io
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -23,8 +24,14 @@ class RealDbWriter(
   private val pdfExtraDownloadHistoryQueries: PdfExtraDownloadHistoryQueries,
   @Io private val ioDispatcher: CoroutineDispatcher,
   private val logger: Logger,
+  @Named("dryRun") private val dryRun: Boolean
 ) : DbWriter {
   override suspend fun write(write: DbWrite): Unit = withContext(ioDispatcher) {
+    if (dryRun) {
+      logger.v("Dry Run Write: $write")
+      return@withContext
+    }
+
     logger.v("Writing $write to db")
     when (write) {
       is LibroFmWishlistSyncStatus -> write.handle(wishlistSyncStatusQueries)

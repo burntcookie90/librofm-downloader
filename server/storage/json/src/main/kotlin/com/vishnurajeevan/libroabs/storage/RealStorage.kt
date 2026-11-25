@@ -12,6 +12,10 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
+/**
+ * JSON-file storage. In a dry run the file is read if it exists but never written: changes are kept in memory for
+ * the life of the process.
+ */
 @OptIn(ExperimentalSerializationApi::class)
 class RealStorage<T : Any>(
   initial: T,
@@ -19,6 +23,7 @@ class RealStorage<T : Any>(
   private val serializer: KSerializer<T>,
   private val dispatcher: CoroutineDispatcher,
   private val logger: Logger,
+  private val dryRun: Boolean = false,
 ) : Storage<T> {
   private val json = Json {
     prettyPrint = true
@@ -27,14 +32,20 @@ class RealStorage<T : Any>(
 
   private val mutex = Mutex()
 
+  /** The dry run's copy of the data, starting from the file when there is one. */
+  private var dryRunData: T? = null
+
   init {
-    if (!file.exists()) {
+    if (dryRun) {
+      logger.v("Dry Run: keeping storage ${file.path} in memory")
+      dryRunData = if (file.exists()) read() else initial
+    } else if (!file.exists()) {
       logger.v("Creating storage for ${file.path}")
       write(initial)
     }
   }
 
-  override suspend fun getData(): T = withContext(dispatcher) { read() }
+  override suspend fun getData(): T = withContext(dispatcher) { mutex.withLock { current() } }
 
   /**
    * Applies [update] and writes the result before returning, so a following [getData] sees it. If [update] throws,
@@ -42,11 +53,18 @@ class RealStorage<T : Any>(
    */
   override suspend fun update(update: suspend (T) -> T) = withContext(dispatcher) {
     mutex.withLock {
-      val new = update(read())
-      logger.v("Writing storage ${file.path}")
-      write(new)
+      val new = update(current())
+      if (dryRun) {
+        logger.v("Dry Run: not writing storage ${file.path}")
+        dryRunData = new
+      } else {
+        logger.v("Writing storage ${file.path}")
+        write(new)
+      }
     }
   }
+
+  private fun current(): T = if (dryRun) dryRunData!! else read()
 
   private fun read(): T = json.decodeFromString(serializer, file.readText())
 
@@ -64,13 +82,15 @@ class RealStorage<T : Any>(
       serializer: KSerializer<T>,
       dispatcher: CoroutineDispatcher,
       logger: Logger,
+      dryRun: Boolean,
     ): Storage<T> =
       RealStorage(
         file = file,
         initial = initial,
         serializer = serializer,
         dispatcher = dispatcher,
-        logger = logger
+        logger = logger,
+        dryRun = dryRun,
       )
   }
 }

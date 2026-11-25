@@ -9,7 +9,6 @@ import com.vishnurajeevan.libroabs.libro.LibroApiHandler
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.App
 import com.vishnurajeevan.libroabs.models.graph.Io
-import com.vishnurajeevan.libroabs.models.graph.Named
 import com.vishnurajeevan.libroabs.models.server.AttemptStatus
 import com.vishnurajeevan.libroabs.models.server.AttemptTrigger
 import com.vishnurajeevan.libroabs.models.server.ServerInfo
@@ -20,6 +19,7 @@ import com.vishnurajeevan.libroabs.server.ui.WebUiBackend
 import com.vishnurajeevan.libroabs.tracker.HardcoverSync
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Named
 import dev.zacsweers.metro.SingleIn
 import io.github.kevincianfarini.cardiologist.fixedPeriodPulse
 import kotlinx.coroutines.*
