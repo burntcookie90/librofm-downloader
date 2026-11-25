@@ -20,6 +20,7 @@ import com.vishnurajeevan.libroabs.connector.TrackerRead
 import com.vishnurajeevan.libroabs.connector.TrackerUserBook
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
 import com.vishnurajeevan.libroabs.connector.TrackerException
+import com.vishnurajeevan.libroabs.connector.TrackerPermissionException
 import com.vishnurajeevan.libroabs.connector.TrackerUnavailableException
 import com.vishnurajeevan.libroabs.models.Logger
 import com.vishnurajeevan.libroabs.models.graph.Io
@@ -129,22 +130,30 @@ class HardcoverTrackerConnector(
     }
     // Narrators Hardcover doesn't know yet are left out rather than added as new people.
     val narrators = extras.narrators.mapNotNull { name -> known?.authors?.firstOrNull { it.name == name }?.id }.distinct()
-    val result = apolloClient.mutation(
-      CreateEditionMutation(
-        book_id = book.id.toInt(),
-        title = book.title,
-        isbn_13 = isbn,
-        release_date = book.releaseDate,
-        contributions = book.contributions.map {
-          ContributionInputType(author_id = it.id.toInt(), contribution = Optional.present("Author"))
-        } + narrators.map {
-          ContributionInputType(author_id = it, contribution = Optional.present("Narrator"))
-        },
-        audio_seconds = extras.audioSeconds,
-        // Publisher ids are bigints, which come back untyped.
-        publisher_id = known?.publishers?.firstOrNull()?.id?.toString()?.toIntOrNull(),
-      )
-    ).data().insert_edition
+    val result = try {
+      apolloClient.mutation(
+        CreateEditionMutation(
+          book_id = book.id.toInt(),
+          title = book.title,
+          isbn_13 = isbn,
+          release_date = book.releaseDate,
+          contributions = book.contributions.map {
+            ContributionInputType(author_id = it.id.toInt(), contribution = Optional.present("Author"))
+          } + narrators.map {
+            ContributionInputType(author_id = it, contribution = Optional.present("Narrator"))
+          },
+          audio_seconds = extras.audioSeconds,
+          // Publisher ids are bigints, which come back untyped.
+          publisher_id = known?.publishers?.firstOrNull()?.id?.toString()?.toIntOrNull(),
+        )
+      ).data()
+    } catch (e: TrackerException) {
+      // Adding editions by hand is a supporter and librarian perk; Hardcover only says so in the error's text.
+      if (e !is TrackerUnavailableException && "only supporters" in e.message.orEmpty().lowercase()) {
+        throw TrackerPermissionException("Hardcover only lets supporters and librarians add editions", e)
+      }
+      throw e
+    }.insert_edition
     val problems = result?.errors?.filterNotNull().orEmpty()
     val edition = result?.edition
     if (edition == null || problems.isNotEmpty()) {

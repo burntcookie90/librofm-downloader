@@ -9,6 +9,7 @@ import com.vishnurajeevan.libroabs.connector.DryRunTrackerConnector
 import com.vishnurajeevan.libroabs.connector.EditionExtras
 import com.vishnurajeevan.libroabs.connector.ReadingStatus
 import com.vishnurajeevan.libroabs.connector.TrackerConnector
+import com.vishnurajeevan.libroabs.connector.TrackerPermissionException
 import com.vishnurajeevan.libroabs.connector.TrackerRead
 import com.vishnurajeevan.libroabs.connector.TrackerUnavailableException
 import com.vishnurajeevan.libroabs.connector.TrackerUserBook
@@ -174,7 +175,9 @@ class HardcoverSync(
     }.toMap()
 
     val notFound = mutableListOf<String>()
-    suspend fun target(isbn: String, title: String, authors: List<String>, details: Book?): Target? {
+    val canAddEditions = !editionsRefused()
+    val needEdition = mutableListOf<String>()
+    suspend fun target(isbn: String, title: String, authors: List<String>, details: Book?, wantOnly: Boolean = false): Target? {
       editions[isbn]?.let { return Target.Edition(it) }
       val match = try {
         search(isbn, title, authors)
@@ -187,14 +190,23 @@ class HardcoverSync(
         return null
       }
       if (match == null) notFound += title
-      return match?.let { Target.NewEdition(it, isbn, details) }
+      match ?: return null
+      if (canAddEditions) return Target.NewEdition(match, isbn, details)
+      // Want to Read takes a book without an edition; owning it and listening progress don't.
+      if (wantOnly) return Target.BookOnly(match)
+      needEdition += title
+      return null
     }
 
     val targets = mutableMapOf<String, Target?>()
     for (book in (toOwn + withProgress).distinctBy { it.isbn }) {
       targets[book.isbn] = target(book.isbn, book.title, book.authors, book)
     }
-    for (book in toWant) targets[book.isbn] = target(book.isbn, book.title, book.authors, null)
+    for (book in toWant) targets[book.isbn] = target(book.isbn, book.title, book.authors, null, wantOnly = true)
+    if (needEdition.isNotEmpty()) {
+      errors += "Hardcover only lets supporters and librarians add audiobook editions, so these books it has in other " +
+        "editions weren't marked owned or sent progress: ${needEdition.distinct().sortedBy { it.lowercase() }.joinToString(", ")}"
+    }
 
     val bookIds = withProgress.mapNotNull { targets[it.isbn]?.bookId }.distinct()
     val userBooks = if (bookIds.isEmpty()) emptyMap() else tracker.getUserBooks(bookIds).associateBy { it.bookId }
@@ -319,28 +331,24 @@ class HardcoverSync(
 
   /** Returns whether anything was done (a dry run does nothing). */
   private suspend fun apply(tracker: TrackerConnector, book: PlannedBook, steps: List<Step>): Boolean {
+    var withoutEdition = false
     val hardcoverBook: ConnectorBook? = when (val target = book.target) {
       is Target.Edition -> target.book
-      is Target.NewEdition -> {
-        val details = target.details ?: libro.bookDetails(book.isbn)
-        tracker.createEdition(
-          ConnectorBook(
-            id = target.match.candidate.id,
-            title = details.title,
-            releaseDate = details.publication_date.toLocalDateTime(TimeZone.UTC).date,
-            contributions = target.match.candidate.authors,
-            connectorAudioBook = listOf(ConnectorAudioBookEdition(id = "", isbn13 = book.isbn)),
-          ),
-          EditionExtras(
-            audioSeconds = details.audiobook_info.duration.takeIf { it > 0 },
-            narrators = details.audiobook_info.narrators.map(::cleanPersonName).filter { it.isNotEmpty() },
-            publisher = details.publisher.takeIf { it.isNotBlank() },
-          ),
-        ) ?: return false
+      is Target.BookOnly -> target.book.also { withoutEdition = true }
+      is Target.NewEdition -> try {
+        if (editionsRefused()) throw TrackerPermissionException("Hardcover only lets supporters and librarians add editions")
+        createEdition(tracker, book, target) ?: return false
+      } catch (e: TrackerPermissionException) {
+        refuseEditions(e)
+        withoutEdition = true
+        target.match.book()
       }
       null -> null
     }
-    for (step in steps) {
+    // Without an edition the book can still go on Want to Read, but can't be owned or given progress.
+    val doable = if (withoutEdition) steps.filter { it is Step.Wanted || it is Step.LibroWishlist } else steps
+    if (doable.size < steps.size) logger.i("Hardcover: ${book.title}: left unowned and without progress, as Hardcover has no edition to put them on")
+    for (step in doable) {
       when (step) {
         is Step.Owned -> tracker.markOwned(hardcoverBook ?: continue)
         is Step.Wanted -> {
@@ -355,7 +363,25 @@ class HardcoverSync(
         }
       }
     }
-    return !serverInfo.dryRun
+    return !serverInfo.dryRun && doable.isNotEmpty()
+  }
+
+  private suspend fun createEdition(tracker: TrackerConnector, book: PlannedBook, target: Target.NewEdition): ConnectorBook? {
+    val details = target.details ?: libro.bookDetails(book.isbn)
+    return tracker.createEdition(
+      ConnectorBook(
+        id = target.match.candidate.id,
+        title = details.title,
+        releaseDate = details.publication_date.toLocalDateTime(TimeZone.UTC).date,
+        contributions = target.match.candidate.authors,
+        connectorAudioBook = listOf(ConnectorAudioBookEdition(id = "", isbn13 = book.isbn)),
+      ),
+      EditionExtras(
+        audioSeconds = details.audiobook_info.duration.takeIf { it > 0 },
+        narrators = details.audiobook_info.narrators.map(::cleanPersonName).filter { it.isNotEmpty() },
+        publisher = details.publisher.takeIf { it.isNotBlank() },
+      ),
+    )
   }
 
   private suspend fun applyProgress(tracker: TrackerConnector, book: ConnectorBook, step: Step.Progress) {
@@ -375,6 +401,19 @@ class HardcoverSync(
     tracker.saveRead(userBookId, read)
   }
 
+  /** Whether Hardcover refused to let this account add editions lately; asked again after [EDITIONS_REFUSED_FOR]. */
+  private suspend fun editionsRefused(): Boolean {
+    val at = syncState.get(EDITIONS_REFUSED_KEY)?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return false
+    return clock.now() - at < EDITIONS_REFUSED_FOR
+  }
+
+  private suspend fun refuseEditions(e: TrackerPermissionException) {
+    if (editionsRefused()) return
+    val now = clock.now()
+    syncState.put(EDITIONS_REFUSED_KEY, now.toString())
+    logger.i("Hardcover: ${e.message}; books it has no audiobook edition of are left out until ${(now + EDITIONS_REFUSED_FOR).toLocalDateTime(zone).date.display()}")
+  }
+
   private fun List<ConnectorBook>.isbns(): Set<String> = flatMap { book -> book.connectorAudioBook.mapNotNull { it.isbn13 } }.toSet()
 
   private sealed interface Target {
@@ -383,6 +422,12 @@ class HardcoverSync(
     /** Hardcover already has this audiobook edition. */
     data class Edition(val book: ConnectorBook) : Target {
       override val bookId: String get() = book.id
+    }
+
+    /** Hardcover has the book but not this audiobook edition, and won't let this account add one. */
+    data class BookOnly(val match: BookMatch) : Target {
+      override val bookId: String get() = match.candidate.id
+      val book: ConnectorBook get() = match.book()
     }
 
     /** Hardcover has the book but not this audiobook edition; applying adds it. [details] is fetched then if `null`. */
@@ -420,6 +465,7 @@ class HardcoverSync(
       match = when (target) {
         is Target.Edition -> HardcoverMatch(target.book.title, null, "ISBN", createsEdition = false)
         is Target.NewEdition -> HardcoverMatch(target.match.candidate.title, target.match.candidate.url, target.match.reason, createsEdition = true)
+        is Target.BookOnly -> HardcoverMatch(target.match.candidate.title, target.match.candidate.url, target.match.reason, createsEdition = false)
         null -> null
       },
       actions = steps.map { it.second },
@@ -430,6 +476,11 @@ class HardcoverSync(
 
   private companion object {
     const val PROGRESS_SINCE_KEY = "hardcover_progress_since"
+    const val EDITIONS_REFUSED_KEY = "hardcover_editions_refused"
+    val EDITIONS_REFUSED_FOR = 7.days
     val PLAN_LIFETIME = 1.hours
   }
 }
+
+/** The matched Hardcover book, without an edition. */
+private fun BookMatch.book() = ConnectorBook(id = candidate.id, title = candidate.title)

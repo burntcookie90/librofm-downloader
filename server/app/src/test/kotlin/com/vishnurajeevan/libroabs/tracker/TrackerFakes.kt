@@ -34,6 +34,7 @@ internal class FakeTracker : TrackerConnector {
   val userBooks = mutableMapOf<String, TrackerUserBook>()
   var created: Pair<ConnectorBook, EditionExtras>? = null
   var failMarkOwned: (ConnectorBook) -> Exception? = { null }
+  var failCreateEdition: Exception? = null
 
   /** A read Hardcover starts itself when a status is set, as the website does. */
   var startsReadOnStatus = false
@@ -48,13 +49,14 @@ internal class FakeTracker : TrackerConnector {
   override suspend fun searchBooks(query: String) = search(query).also { calls += "search $query" }
 
   override suspend fun createEdition(book: ConnectorBook, extras: EditionExtras): ConnectorBook {
-    created = book to extras
     calls += "createEdition ${book.id}"
+    failCreateEdition?.let { throw it }
+    created = book to extras
     return book.copy(connectorAudioBook = listOf(book.connectorAudioBook.first().copy(id = "new-edition")))
   }
 
   override suspend fun markWanted(book: ConnectorBook) {
-    calls += "markWanted ${book.id}/${book.connectorAudioBook.first().id}"
+    calls += "markWanted ${book.id}/${book.connectorAudioBook.firstOrNull()?.id}"
   }
 
   override suspend fun markOwned(book: ConnectorBook) {

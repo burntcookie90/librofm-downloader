@@ -8,6 +8,7 @@ import com.vishnurajeevan.libroabs.connector.EditionExtras
 import com.vishnurajeevan.libroabs.connector.ReadingStatus
 import com.vishnurajeevan.libroabs.connector.TrackerRead
 import com.vishnurajeevan.libroabs.connector.TrackerException
+import com.vishnurajeevan.libroabs.connector.TrackerPermissionException
 import com.vishnurajeevan.libroabs.connector.TrackerUnavailableException
 import com.vishnurajeevan.libroabs.models.Logger
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,15 @@ class HardcoverTrackerConnectorTest {
     reply = """{"data":{"insert_edition":{"id":null,"errors":["ISBN already taken"],"edition":null}}}"""
     val error = assertFailsWith<TrackerException> { connector().createEdition(book) }
     assertTrue("ISBN already taken" in error.message!!, error.message)
+  }
+
+  @Test
+  fun anAccountThatMayNotAddEditionsIsTold() = runBlocking {
+    reply = """{"errors":[{"message":"Only supporters and librarians can add books and editions manually."}]}"""
+    assertFailsWith<TrackerPermissionException> {
+      connector().createEdition(book.copy(connectorAudioBook = listOf(ConnectorAudioBookEdition("", "9781250000000"))))
+    }
+    Unit
   }
 
   @Test

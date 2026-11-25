@@ -7,6 +7,7 @@ import com.vishnurajeevan.libroabs.connector.ConnectorContributor
 import com.vishnurajeevan.libroabs.connector.ReadingStatus
 import com.vishnurajeevan.libroabs.connector.TrackerCandidate
 import com.vishnurajeevan.libroabs.connector.TrackerException
+import com.vishnurajeevan.libroabs.connector.TrackerPermissionException
 import com.vishnurajeevan.libroabs.connector.TrackerUnavailableException
 import com.vishnurajeevan.libroabs.connector.TrackerUserBook
 import com.vishnurajeevan.libroabs.db.writer.TrackerWishlistSyncStatus
@@ -98,6 +99,45 @@ class HardcoverSyncTest {
     assertEquals(listOf("Kevin R. Free"), extras.narrators)
     assertEquals("Recorded Books", extras.publisher)
     assertTrue("markOwned hc-1/new-edition" in tracker.calls, tracker.calls.toString())
+  }
+
+  @Test
+  fun anAccountThatCantAddEditionsDoesntFailTheSyncAndStopsTrying() = runBlocking {
+    shelves.library = listOf(testBook("333", "Artificial Condition").copy(authors = listOf("Martha Wells")))
+    shelves.details = { testBook(it, "Artificial Condition") }
+    tracker.search = { listOf(candidate("hc-1", "Artificial Condition", "Martha Wells")) }
+    tracker.failCreateEdition = TrackerPermissionException("Hardcover only lets supporters and librarians add editions")
+
+    sync().syncAutomatically()
+    assertEquals(listOf("search Artificial Condition Martha Wells", "createEdition hc-1"), tracker.calls)
+
+    // Later syncs don't ask again, and say why the book was left out.
+    tracker.calls.clear()
+    val preview = sync().preview()
+    assertTrue(preview.books.isEmpty())
+    assertTrue(preview.errors.single().contains("Artificial Condition"), preview.errors.toString())
+    sync().syncAutomatically()
+    assertTrue("createEdition hc-1" !in tracker.calls, tracker.calls.toString())
+
+    // A week on, it's tried again in case the account has become a supporter.
+    clock.now += 8.days
+    sync().syncAutomatically()
+    assertTrue("createEdition hc-1" in tracker.calls, tracker.calls.toString())
+  }
+
+  @Test
+  fun aWishlistBookStillGoesToWantToReadWhenEditionsCantBeAdded() = runBlocking {
+    shelves.wishlist = listOf(AudioBook("Artificial Condition", "333", listOf("Martha Wells")))
+    shelves.details = { testBook(it, "Artificial Condition") }
+    tracker.search = { listOf(candidate("hc-1", "Artificial Condition", "Martha Wells")) }
+    tracker.failCreateEdition = TrackerPermissionException("Hardcover only lets supporters and librarians add editions")
+    val info = trackerInfo(mode = TrackerSyncMode.LIBRO_WISHLISTS_TO_HARDCOVER)
+
+    sync(info).syncAutomatically()
+    assertTrue("markWanted hc-1/null" in tracker.calls, tracker.calls.toString())
+
+    val plan = sync(info).preview().books.single()
+    assertTrue(!plan.match!!.createsEdition)
   }
 
   @Test

@@ -7,3 +7,6 @@ open class TrackerException(message: String, cause: Throwable? = null) : IOExcep
 
 /** The tracker won't take requests at all right now (a bad token, or its rate limit), so there is no point going on. */
 class TrackerUnavailableException(message: String, cause: Throwable? = null) : TrackerException(message, cause)
+
+/** The tracker account isn't allowed to do this (Hardcover only lets supporters and librarians add editions). */
+class TrackerPermissionException(message: String, cause: Throwable? = null) : TrackerException(message, cause)
